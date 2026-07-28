@@ -18,6 +18,8 @@ const boardRoutes = require("./routes/boardRoutes")
 const listRoutes = require("./routes/listRoutes");
 const cardRoutes = require ("./routes/cardRoutes");
 const labelRoutes = require("./routes/labelRoutes");
+const memberRoutes = require("./routes/memberRoutes");
+const commentRoutes = require("./routes/commentRoutes");
 const app = express();
 
 app.use(cors());
@@ -29,13 +31,15 @@ app.use("/api/boards" , boardRoutes);
 app.use("/api/lists", listRoutes);
 app.use("/api/cards" , cardRoutes);
 app.use("/api/labels" , labelRoutes);
+app.use("/api/members", memberRoutes);
+app.use("/api/comments" , commentRoutes);
 sequelize
   .authenticate()
   .then(async () => {
     console.log("Database Connected");
 
   await sequelize.sync();
-  // await sequelize.sync({ force: true });
+  // await sequelize.sync({ alter: true });
 
     console.log("Tables Synced");
   })

@@ -11,6 +11,7 @@ const createCard = async (req, res) => {
       dueDate,
       position,
       listId,
+      coverImage,
     } = req.body;
 
     // Validation
@@ -57,6 +58,7 @@ const createCard = async (req, res) => {
       dueDate,
       position,
       listId,
+      coverImage,
     });
 
     return res.status(201).json({
@@ -193,6 +195,7 @@ const updateCard = async (req, res) => {
       position,
       isCompleted,
       listId,
+      coverImage,
     } = req.body;
 
     // Find card
@@ -230,6 +233,7 @@ const updateCard = async (req, res) => {
     if (position !== undefined) card.position = position;
     if (isCompleted !== undefined) card.isCompleted = isCompleted;
     if (listId !== undefined) card.listId = listId;
+    if (coverImage !== undefined) card.coverImage = coverImage;
 
     await card.save();
 

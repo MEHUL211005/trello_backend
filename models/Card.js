@@ -11,7 +11,10 @@ const Card = sequelize.define("Card", {
     type: DataTypes.TEXT,
     allowNull: true,
   },
-
+coverImage: {
+  type: DataTypes.STRING,
+  allowNull: true,
+},
   dueDate: {
     type: DataTypes.DATE,
     allowNull: true,

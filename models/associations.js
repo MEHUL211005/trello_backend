@@ -4,6 +4,7 @@ const Workspace = require("./Workspace");
 const List = require("./List");
 const Card = require("./Card");
 const Label = require("./Label");
+const Comment = require("./Comment")
 // User -> Workspace
 User.hasMany(Workspace, {
   foreignKey: "userId",
@@ -61,6 +62,34 @@ Label.belongsToMany(Card, {
   foreignKey: "labelId",
 });
 
+Card.belongsToMany(User , {
+  through: "CardMembers",
+  foreignKey: "cardId",
+});
+User.belongsToMany(Card , {
+  through: "CardMembers",
+  foreignKey: "UserId",
+});
+
+// Card -> Comments
+Card.hasMany(Comment, {
+  foreignKey: "cardId",
+  onDelete: "CASCADE",
+});
+
+Comment.belongsTo(Card, {
+  foreignKey: "cardId",
+});
+
+// User -> Comments
+User.hasMany(Comment, {
+  foreignKey: "userId",
+  onDelete: "CASCADE",
+});
+
+Comment.belongsTo(User, {
+  foreignKey: "userId",
+});
 module.exports = {
   User,
   Workspace,
@@ -68,4 +97,5 @@ module.exports = {
   List,
   Card,
   Label,
+  Comment,
 };
