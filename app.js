@@ -21,6 +21,7 @@ const labelRoutes = require("./routes/labelRoutes");
 const memberRoutes = require("./routes/memberRoutes");
 const commentRoutes = require("./routes/commentRoutes");
 const checklistRoutes = require("./routes/checklistRoutes");
+const activityRoutes = require("./routes/activityRoutes");
 const app = express();
 
 app.use(cors());
@@ -35,6 +36,7 @@ app.use("/api/labels" , labelRoutes);
 app.use("/api/members", memberRoutes);
 app.use("/api/comments" , commentRoutes);
 app.use("/api/checklists" , checklistRoutes);
+app.use("/api/activities" , activityRoutes);
 sequelize
   .authenticate()
   .then(async () => {

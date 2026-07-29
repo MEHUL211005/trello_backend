@@ -4,6 +4,7 @@ const List = require("../models/List");
 const Board = require("../models/Board");
 const Workspace = require("../models/Workspace");
 const ChecklistItem = require("../models/ChecklistItem");
+const createActivity = require("../utils/createActivity");
 
 const createChecklist = async (req, res) => {
   try {
@@ -69,6 +70,7 @@ const createChecklist = async (req, res) => {
 
   }
 };
+
 const getChecklists = async (req, res) => {
   try {
 
@@ -246,6 +248,14 @@ const toggleChecklistItem = async (req, res) => {
     item.completed = !item.completed;
 
     await item.save();
+
+    await createActivity(
+  item.completed
+    ? "completed a checklist item"
+    : "unchecked a checklist item",
+  item.Checklist.cardId,
+  req.user.id
+);
 
     return res.status(200).json({
       success: true,

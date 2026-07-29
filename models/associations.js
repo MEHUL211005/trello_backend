@@ -7,6 +7,7 @@ const Label = require("./Label");
 const Comment = require("./Comment");
 const Checklist = require("./Checklist");
 const ChecklistItem = require("./ChecklistItem");
+const Activity = require("./Activity");
 // User -> Workspace
 User.hasMany(Workspace, {
   foreignKey: "userId",
@@ -113,6 +114,25 @@ ChecklistItem.belongsTo(Checklist, {
   foreignKey: "checklistId",
 });
 
+
+User.hasMany(Activity, {
+  foreignKey: "userId",
+});
+
+Activity.belongsTo(User, {
+  foreignKey: "userId",
+});
+
+
+Card.hasMany(Activity, {
+  foreignKey: "cardId",
+  onDelete: "CASCADE",
+});
+
+Activity.belongsTo(Card, {
+  foreignKey: "cardId",
+});
+
 module.exports = {
   User,
   Workspace,
@@ -123,4 +143,5 @@ module.exports = {
   Comment,
   Checklist,
   ChecklistItem,
+  Activity,
 };

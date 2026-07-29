@@ -4,6 +4,8 @@ const List = require("../models/List");
 const Board = require("../models/Board");
 const Workspace = require("../models/Workspace");
 const User = require("../models/User");
+const createActivity = require("../utils/createActivity");
+
 const addComment = async (req, res) => {
   try {
 
@@ -52,7 +54,11 @@ const addComment = async (req, res) => {
       cardId,
       userId: req.user.id,
     });
-
+    await createActivity(
+  "added a comment",
+  cardId,
+  req.user.id
+);
     return res.status(201).json({
       success: true,
       comment,

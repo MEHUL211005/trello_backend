@@ -4,7 +4,7 @@ const Card = require("../models/Card");
 const List = require("../models/List");
 const Board = require("../models/Board");
 const Workspace = require("../models/Workspace");
-
+const createActivity = require("../utils/createActivity");
 // CREATE CARD
 const createCard = async (req, res) => {
   try {
@@ -59,7 +59,11 @@ const createCard = async (req, res) => {
       listId,
       coverImage,
     });
-
+    await createActivity(
+    "created this card",
+     card.id,
+    req.user.id
+    );
     return res.status(201).json({
       success: true,
       message: "Card created successfully",
@@ -235,15 +239,25 @@ const updateCard = async (req, res) => {
 
       card.title = title.trim();
     }
+if (description !== undefined) {
+  card.description = description;
 
-    if (description !== undefined) {
-      card.description = description;
-    }
+  await createActivity(
+    "updated the description",
+    card.id,
+    req.user.id
+  );
+}
 
-    if (dueDate !== undefined) {
-      card.dueDate = dueDate;
-    }
+if (dueDate !== undefined) {
+  card.dueDate = dueDate;
 
+  await createActivity(
+    "changed the due date",
+    card.id,
+    req.user.id
+  );
+}
     if (position !== undefined) {
       card.position = position;
     }
@@ -349,7 +363,13 @@ const updateDueDate = async (req, res) => {
 
     card.dueDate = dueDate;
 
-    await card.save();
+await createActivity(
+  "changed the due date",
+  card.id,
+  req.user.id
+);
+
+await card.save();
 
     return res.status(200).json({
       success: true,
