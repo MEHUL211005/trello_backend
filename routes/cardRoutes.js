@@ -8,12 +8,16 @@ const {
   getCards,
   getSingleCard,
   updateCard,
-  deleteCard
+  deleteCard,
+  updateDueDate,
+  searchCards
 } = require("../controllers/cardController");
 
 router.post("/", authMiddleware, createCard);
+router.get("/search", authMiddleware, searchCards);
 router.get("/single/:id" , authMiddleware , getSingleCard);
 router.get("/:listId" , authMiddleware , getCards);
 router.put("/:id" , authMiddleware , updateCard);
 router.delete("/:id" , authMiddleware , deleteCard);
+router.patch("/:id/due-date" , authMiddleware , updateDueDate);
 module.exports = router;

@@ -1,8 +1,11 @@
+const { Op } = require("sequelize");
+
 const Card = require("../models/Card");
 const List = require("../models/List");
 const Board = require("../models/Board");
 const Workspace = require("../models/Workspace");
 
+// CREATE CARD
 const createCard = async (req, res) => {
   try {
     let {
@@ -14,7 +17,6 @@ const createCard = async (req, res) => {
       coverImage,
     } = req.body;
 
-    // Validation
     if (!title || !listId) {
       return res.status(400).json({
         success: false,
@@ -24,7 +26,6 @@ const createCard = async (req, res) => {
 
     title = title.trim();
 
-    // Find List
     const list = await List.findByPk(listId);
 
     if (!list) {
@@ -34,7 +35,6 @@ const createCard = async (req, res) => {
       });
     }
 
-    // Verify ownership
     const board = await Board.findByPk(list.boardId);
 
     const workspace = await Workspace.findOne({
@@ -51,7 +51,6 @@ const createCard = async (req, res) => {
       });
     }
 
-    // Create card
     const card = await Card.create({
       title,
       description,
@@ -78,12 +77,13 @@ const createCard = async (req, res) => {
 
   }
 };
+
+// GET CARDS BY LIST
 const getCards = async (req, res) => {
   try {
 
     const { listId } = req.params;
 
-    // Find List
     const list = await List.findByPk(listId);
 
     if (!list) {
@@ -93,7 +93,6 @@ const getCards = async (req, res) => {
       });
     }
 
-    // Verify ownership
     const board = await Board.findByPk(list.boardId);
 
     const workspace = await Workspace.findOne({
@@ -110,11 +109,8 @@ const getCards = async (req, res) => {
       });
     }
 
-    // Get cards
     const cards = await Card.findAll({
-      where: {
-        listId,
-      },
+      where: { listId },
       order: [["position", "ASC"]],
     });
 
@@ -134,12 +130,13 @@ const getCards = async (req, res) => {
 
   }
 };
+
+// GET SINGLE CARD
 const getSingleCard = async (req, res) => {
   try {
 
     const { id } = req.params;
 
-    // Find card
     const card = await Card.findByPk(id);
 
     if (!card) {
@@ -149,7 +146,6 @@ const getSingleCard = async (req, res) => {
       });
     }
 
-    // Ownership verification
     const list = await List.findByPk(card.listId);
     const board = await Board.findByPk(list.boardId);
 
@@ -183,12 +179,14 @@ const getSingleCard = async (req, res) => {
 
   }
 };
+
+// UPDATE CARD (PATCH STYLE)
 const updateCard = async (req, res) => {
   try {
 
     const { id } = req.params;
 
-    let {
+    const {
       title,
       description,
       dueDate,
@@ -198,7 +196,6 @@ const updateCard = async (req, res) => {
       coverImage,
     } = req.body;
 
-    // Find card
     const card = await Card.findByPk(id);
 
     if (!card) {
@@ -208,7 +205,6 @@ const updateCard = async (req, res) => {
       });
     }
 
-    // Ownership verification
     const list = await List.findByPk(card.listId);
     const board = await Board.findByPk(list.boardId);
 
@@ -227,13 +223,42 @@ const updateCard = async (req, res) => {
     }
 
     // Update only provided fields
-    if (title !== undefined) card.title = title.trim();
-    if (description !== undefined) card.description = description;
-    if (dueDate !== undefined) card.dueDate = dueDate;
-    if (position !== undefined) card.position = position;
-    if (isCompleted !== undefined) card.isCompleted = isCompleted;
-    if (listId !== undefined) card.listId = listId;
-    if (coverImage !== undefined) card.coverImage = coverImage;
+
+    if (title !== undefined) {
+
+      if (!title.trim()) {
+        return res.status(400).json({
+          success: false,
+          message: "Title cannot be empty",
+        });
+      }
+
+      card.title = title.trim();
+    }
+
+    if (description !== undefined) {
+      card.description = description;
+    }
+
+    if (dueDate !== undefined) {
+      card.dueDate = dueDate;
+    }
+
+    if (position !== undefined) {
+      card.position = position;
+    }
+
+    if (isCompleted !== undefined) {
+      card.isCompleted = isCompleted;
+    }
+
+    if (listId !== undefined) {
+      card.listId = listId;
+    }
+
+    if (coverImage !== undefined) {
+      card.coverImage = coverImage;
+    }
 
     await card.save();
 
@@ -254,6 +279,8 @@ const updateCard = async (req, res) => {
 
   }
 };
+
+// DELETE CARD
 const deleteCard = async (req, res) => {
   try {
 
@@ -268,7 +295,6 @@ const deleteCard = async (req, res) => {
       });
     }
 
-    // Ownership verification
     const list = await List.findByPk(card.listId);
     const board = await Board.findByPk(list.boardId);
 
@@ -304,10 +330,102 @@ const deleteCard = async (req, res) => {
 
   }
 };
+
+// UPDATE DUE DATE
+const updateDueDate = async (req, res) => {
+  try {
+
+    const { id } = req.params;
+    const { dueDate } = req.body;
+
+    const card = await Card.findByPk(id);
+
+    if (!card) {
+      return res.status(404).json({
+        success: false,
+        message: "Card not found",
+      });
+    }
+
+    card.dueDate = dueDate;
+
+    await card.save();
+
+    return res.status(200).json({
+      success: true,
+      card,
+    });
+
+  } catch (error) {
+
+    console.log("Update Due Date Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
+
+  }
+};
+
+// SEARCH CARDS
+const searchCards = async (req, res) => {
+  try {
+
+    const { query } = req.query;
+
+    if (!query || query.trim() === "") {
+      return res.status(400).json({
+        success: false,
+        message: "Search query is required",
+      });
+    }
+
+    const cards = await Card.findAll({
+  where: {
+    title: {
+      [Op.like]: `%${query}%`,
+    },
+  },
+  include: [
+    {
+      model: List,
+      attributes: ["id", "name"],
+      include: [
+        {
+          model: Board,
+          attributes: ["id", "name"],
+        },
+      ],
+    },
+  ],
+  order: [["createdAt", "DESC"]],
+});
+
+    return res.status(200).json({
+      success: true,
+      count: cards.length,
+      cards,
+    });
+
+  } catch (error) {
+
+    console.log("Search Cards Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
+
+  }
+};
+
 module.exports = {
   createCard,
   getCards,
   getSingleCard,
   updateCard,
   deleteCard,
+  updateDueDate,
+  searchCards,
 };
