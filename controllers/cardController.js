@@ -439,7 +439,47 @@ const searchCards = async (req, res) => {
 
   }
 };
+const reorderCards = async (req, res) => {
+  try {
 
+    const { cards } = req.body;
+
+    if (!Array.isArray(cards) || cards.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Cards array is required",
+      });
+    }
+
+    for (const card of cards) {
+
+      await Card.update(
+        {
+          position: card.position,
+        },
+        {
+          where: { id: card.id },
+        }
+      );
+
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Cards reordered successfully",
+    });
+
+  } catch (error) {
+
+    console.log("Reorder Cards Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
+
+  }
+};
 module.exports = {
   createCard,
   getCards,
@@ -448,4 +488,5 @@ module.exports = {
   deleteCard,
   updateDueDate,
   searchCards,
+  reorderCards
 };

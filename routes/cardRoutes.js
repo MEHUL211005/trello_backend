@@ -10,11 +10,13 @@ const {
   updateCard,
   deleteCard,
   updateDueDate,
-  searchCards
+  searchCards,
+  reorderCards
 } = require("../controllers/cardController");
 
 router.post("/", authMiddleware, createCard);
 router.get("/search", authMiddleware, searchCards);
+router.patch("/reorder" , authMiddleware , reorderCards);
 router.get("/single/:id" , authMiddleware , getSingleCard);
 router.get("/:listId" , authMiddleware , getCards);
 router.put("/:id" , authMiddleware , updateCard);

@@ -216,9 +216,51 @@ const deleteList = async (req, res) => {
     });
   }
 };
+const reorderLists = async (req, res) => {
+  try {
+
+    const { lists } = req.body;
+
+    if (!Array.isArray(lists) || lists.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Lists array is required",
+      });
+    }
+
+    for (const list of lists) {
+
+      await List.update(
+        {
+          position: list.position,
+        },
+        {
+          where: { id: list.id },
+        }
+      );
+
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Lists reordered successfully",
+    });
+
+  } catch (error) {
+
+    console.log("Reorder Lists Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
+
+  }
+};
 module.exports = {
   createList,
   getLists,
   updateList,
-  deleteList
+  deleteList,
+  reorderLists,
 };

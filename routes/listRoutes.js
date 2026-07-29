@@ -7,12 +7,13 @@ const {
   createList,
   getLists,
   updateList,
-  deleteList
+  deleteList,
+  reorderLists,
 } = require("../controllers/listController");
 
 router.post("/", authMiddleware, createList);
+router.patch("/reorder" , authMiddleware , reorderLists);
 router.get("/:boardId" , authMiddleware, getLists);
 router.put("/:id", authMiddleware, updateList);
 router.delete("/:id", authMiddleware, deleteList);
-
 module.exports = router;
