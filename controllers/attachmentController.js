@@ -120,8 +120,54 @@ const deleteAttachment = async (req, res) => {
 
   }
 };
+const setAttachmentAsCover = async (req, res) => {
+  try {
+
+    const { id } = req.params;
+
+    const attachment = await Attachment.findByPk(id);
+
+    if (!attachment) {
+      return res.status(404).json({
+        success: false,
+        message: "Attachment not found",
+      });
+    }
+
+    const card = await Card.findByPk(attachment.cardId);
+
+    if (!card) {
+      return res.status(404).json({
+        success: false,
+        message: "Card not found",
+      });
+    }
+
+    // Set cover image
+    card.coverImage = attachment.fileUrl;
+
+    await card.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Attachment set as cover",
+      coverImage: card.coverImage,
+    });
+
+  } catch (error) {
+
+    console.log("Set Cover Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
+
+  }
+};
 module.exports = {
   uploadAttachment,
   getAttachments,
   deleteAttachment,
+  setAttachmentAsCover,
 };

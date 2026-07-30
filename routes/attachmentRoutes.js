@@ -7,7 +7,8 @@ const upload = require("../middlewares/uploadMiddleware");
 const {
   uploadAttachment,
   getAttachments,
-  deleteAttachment
+  deleteAttachment,
+  setAttachmentAsCover,
 } = require("../controllers/attachmentController");
 
 router.post(
@@ -19,4 +20,5 @@ router.post(
 
 router.get("/cards/:cardId" , authMiddleware , getAttachments);
 router.delete("/:id" , authMiddleware , deleteAttachment);
+router.patch("/:id/set-cover" , authMiddleware , setAttachmentAsCover);
 module.exports = router;
