@@ -1,7 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
-
+const app = express();
 const sequelize = require("./config/database");
 
 const User = require("./models/User");
@@ -22,11 +22,11 @@ const memberRoutes = require("./routes/memberRoutes");
 const commentRoutes = require("./routes/commentRoutes");
 const checklistRoutes = require("./routes/checklistRoutes");
 const activityRoutes = require("./routes/activityRoutes");
-const app = express();
+const attachmentRoutes = require("./routes/attachmentRoutes");
 
 app.use(cors());
 app.use(express.json());
-
+app.use("/uploads", express.static("uploads"));
 app.use("/api/auth", authRoutes);
 app.use("/api/workspaces", workspaceRoutes);
 app.use("/api/boards" , boardRoutes);
@@ -37,6 +37,7 @@ app.use("/api/members", memberRoutes);
 app.use("/api/comments" , commentRoutes);
 app.use("/api/checklists" , checklistRoutes);
 app.use("/api/activities" , activityRoutes);
+app.use("/api/attachments" , attachmentRoutes);
 sequelize
   .authenticate()
   .then(async () => {
