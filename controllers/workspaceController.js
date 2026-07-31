@@ -1,5 +1,5 @@
 const Workspace = require("../models/Workspace");
-
+const Board = require("../models/Board");
 
 const createWorkspace = async (req, res) => {
   try {
@@ -45,12 +45,20 @@ const createWorkspace = async (req, res) => {
 const getWorkspaces = async (req, res) => {
   try {
 
-    const workspaces = await Workspace.findAll({
-      where: {
-        userId: req.user.id,
-      },
-      order: [["createdAt", "DESC"]],
-    });
+   const workspaces = await Workspace.findAll({
+ where:{
+   userId:req.user.id,
+ },
+ include:[
+   {
+     model:Board,
+     as:"boards"
+   }
+ ],
+ order:[
+   ["createdAt","DESC"]
+ ],
+});
 
     return res.status(200).json({
       success: true,
@@ -67,6 +75,56 @@ const getWorkspaces = async (req, res) => {
     });
 
   }
+};
+const getWorkspaceById = async(req,res)=>{
+
+try{
+
+const workspace = await Workspace.findOne({
+
+where:{
+ id:req.params.id,
+ userId:req.user.id
+},
+
+include:[
+{
+ model:Board,
+ as:"boards"
+}
+]
+
+});
+
+
+if(!workspace){
+
+return res.status(404).json({
+ success:false,
+ message:"Workspace not found"
+});
+
+}
+
+
+res.status(200).json({
+success:true,
+workspace
+});
+
+
+}
+catch(error){
+
+console.log(error);
+
+res.status(500).json({
+success:false,
+message:"Server Error"
+});
+
+}
+
 };
 const updateWorkspace = async (req, res) => {
   try {
@@ -161,5 +219,6 @@ module.exports = {
   createWorkspace,
   getWorkspaces,
   updateWorkspace,
-  deleteWorkspace
+  deleteWorkspace,
+  getWorkspaceById,
 };

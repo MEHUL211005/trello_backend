@@ -20,16 +20,19 @@ Workspace.belongsTo(User, {
   foreignKey: "userId",
 });
 
-Workspace.hasMany(Board, {
-  foreignKey: "workspaceId",
+Workspace.hasMany(Board,{
+ foreignKey:"workspaceId",
+ as:"boards"
 });
 
-Board.belongsTo(Workspace, {
-  foreignKey: "workspaceId",
+Board.belongsTo(Workspace,{
+ foreignKey:"workspaceId",
+ as:"workspace"
 });
 
 Board.hasMany(List, {
   foreignKey: "boardId",
+  as: "lists",
 });
 
 List.belongsTo(Board, {
@@ -37,11 +40,13 @@ List.belongsTo(Board, {
 });
 
 List.hasMany(Card, {
-  foreignKey : "listId",
-  onDelete : "CASCADE",
+  foreignKey: "listId",
+  onDelete: "CASCADE",
+  as: "cards",
 });
-Card.belongsTo(List , {
-  foreignKey:"listId",
+
+Card.belongsTo(List, {
+  foreignKey: "listId",
 });
 
 // Board -> Label

@@ -2,12 +2,14 @@ const express = require("express");
 const router = express.Router();
 
 const authMiddleware = require("../middlewares/authMiddleware");
-const { createWorkspace , getWorkspaces , updateWorkspace , deleteWorkspace } = require("../controllers/workspaceController");
+const { createWorkspace , getWorkspaces , updateWorkspace , deleteWorkspace , getWorkspaceById } = require("../controllers/workspaceController");
 
 
 router.post("/", authMiddleware, createWorkspace);
 
 router.get("/", authMiddleware, getWorkspaces);
+
+router.get("/:id", authMiddleware, getWorkspaceById);
 
 router.put("/:id" , authMiddleware , updateWorkspace);
 

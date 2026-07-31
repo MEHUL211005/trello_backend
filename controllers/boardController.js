@@ -1,5 +1,7 @@
 const Board = require("../models/Board");
 const Workspace = require("../models/Workspace");
+const List = require("../models/List");
+const Card = require("../models/Card");
 
 const createBoard = async (req, res) => {
   try {
@@ -206,9 +208,64 @@ const deleteBoard = async (req, res) => {
 
   }
 };
+const getBoardById = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const board = await Board.findByPk(id, {
+      include: [
+        {
+          model: List,
+          as: "lists",
+          include: [
+            {
+              model: Card,
+              as: "cards",
+            },
+          ],
+        },
+      ],
+    });
+
+    if (!board) {
+      return res.status(404).json({
+        success: false,
+        message: "Board not found",
+      });
+    }
+
+    const workspace = await Workspace.findOne({
+      where: {
+        id: board.workspaceId,
+        userId: req.user.id,
+      },
+    });
+
+    if (!workspace) {
+      return res.status(403).json({
+        success: false,
+        message: "Access denied",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      board,
+    });
+
+  } catch (error) {
+    console.log("Get Board Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
+  }
+};
 module.exports = {
   createBoard,
   getBoards,
   updateBoard,
-  deleteBoard
+  deleteBoard,
+  getBoardById,
 };

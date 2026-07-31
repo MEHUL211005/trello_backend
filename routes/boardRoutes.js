@@ -7,7 +7,8 @@ const {
   createBoard,
   getBoards,
   updateBoard,
-  deleteBoard
+  deleteBoard,
+  getBoardById,
 } = require("../controllers/boardController");
 
 router.post(
@@ -15,7 +16,7 @@ router.post(
   authMiddleware,
   createBoard
 );
-
+router.get("/single/:id", authMiddleware, getBoardById);
 router.get("/:workspaceId" , authMiddleware , getBoards);
 router.put("/:id" , authMiddleware , updateBoard);
 router.delete("/:id" , authMiddleware , deleteBoard)
