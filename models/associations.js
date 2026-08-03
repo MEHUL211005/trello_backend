@@ -74,10 +74,14 @@ Label.belongsToMany(Card, {
 Card.belongsToMany(User , {
   through: "CardMembers",
   foreignKey: "cardId",
+  as:"members",
 });
+
+
 User.belongsToMany(Card , {
-  through: "CardMembers",
-  foreignKey: "UserId",
+  through:"CardMembers",
+  foreignKey:"userId",
+  as:"cards",
 });
 
 // Card -> Comments

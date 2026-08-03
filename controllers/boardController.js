@@ -2,7 +2,10 @@ const Board = require("../models/Board");
 const Workspace = require("../models/Workspace");
 const List = require("../models/List");
 const Card = require("../models/Card");
-
+const Checklist = require("../models/Checklist");
+const ChecklistItem = require("../models/ChecklistItem");
+const User = require("../models/User");
+const Attachment = require("../models/Attachment");
 const createBoard = async (req, res) => {
   try {
 
@@ -218,10 +221,31 @@ const getBoardById = async (req, res) => {
           model: List,
           as: "lists",
           include: [
-            {
-              model: Card,
-              as: "cards",
-            },
+           {
+  model: Card,
+  as: "cards",
+  include: [
+    {
+      model: User,
+      as: "members",
+      attributes: ["id", "name", "email"],
+      through: { attributes: [] },
+    },
+
+    {
+      model: Checklist,
+      include: [
+        {
+          model: ChecklistItem,
+        },
+      ],
+    },
+
+    {
+      model: Attachment,
+    },
+  ],
+}
           ],
         },
       ],
@@ -254,12 +278,14 @@ const getBoardById = async (req, res) => {
     });
 
   } catch (error) {
+
     console.log("Get Board Error:", error);
 
     return res.status(500).json({
       success: false,
       message: "Internal Server Error",
     });
+
   }
 };
 module.exports = {

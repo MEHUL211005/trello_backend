@@ -23,6 +23,7 @@ const commentRoutes = require("./routes/commentRoutes");
 const checklistRoutes = require("./routes/checklistRoutes");
 const activityRoutes = require("./routes/activityRoutes");
 const attachmentRoutes = require("./routes/attachmentRoutes");
+const uploadRoute = require("./routes/uploadRoute");
 
 app.use(cors());
 app.use(express.json());
@@ -38,6 +39,7 @@ app.use("/api/comments" , commentRoutes);
 app.use("/api/checklists" , checklistRoutes);
 app.use("/api/activities" , activityRoutes);
 app.use("/api/attachments" , attachmentRoutes);
+app.use("/api/upload", uploadRoute);
 sequelize
   .authenticate()
   .then(async () => {

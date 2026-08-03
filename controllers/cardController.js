@@ -5,6 +5,8 @@ const List = require("../models/List");
 const Board = require("../models/Board");
 const Workspace = require("../models/Workspace");
 const createActivity = require("../utils/createActivity");
+const Checklist = require("../models/Checklist");
+const ChecklistItem = require("../models/ChecklistItem");
 // CREATE CARD
 const createCard = async (req, res) => {
   try {
@@ -113,10 +115,35 @@ const getCards = async (req, res) => {
       });
     }
 
-    const cards = await Card.findAll({
-      where: { listId },
-      order: [["position", "ASC"]],
-    });
+  const cards = await Card.findAll({
+
+  where: { listId },
+
+
+  include:[
+    {
+      model: Checklist,
+
+      include:[
+        {
+          model: ChecklistItem,
+          attributes:[
+            "id",
+            "text",
+            "completed"
+          ]
+        }
+      ]
+
+    }
+  ],
+
+
+  order: [
+    ["position", "ASC"]
+  ]
+
+});
 
     return res.status(200).json({
       success: true,
@@ -141,7 +168,30 @@ const getSingleCard = async (req, res) => {
 
     const { id } = req.params;
 
-    const card = await Card.findByPk(id);
+
+    const card = await Card.findByPk(id, {
+
+      include: [
+        {
+          model: Checklist,
+
+          include: [
+            {
+              model: ChecklistItem,
+              attributes: [
+                "id",
+                "text",
+                "completed"
+              ],
+            },
+          ],
+
+        },
+      ],
+
+    });
+
+
 
     if (!card) {
       return res.status(404).json({
@@ -150,36 +200,62 @@ const getSingleCard = async (req, res) => {
       });
     }
 
+
+
     const list = await List.findByPk(card.listId);
+
+
     const board = await Board.findByPk(list.boardId);
 
+
+
     const workspace = await Workspace.findOne({
+
       where: {
         id: board.workspaceId,
         userId: req.user.id,
       },
+
     });
+
+
 
     if (!workspace) {
+
       return res.status(403).json({
+
         success: false,
         message: "Access denied",
+
       });
+
     }
 
+
+
     return res.status(200).json({
+
       success: true,
       card,
+
     });
+
+
 
   } catch (error) {
 
+
     console.log("Get Single Card Error:", error);
 
+
+
     return res.status(500).json({
+
       success: false,
       message: "Internal Server Error",
+
     });
+
 
   }
 };
@@ -451,33 +527,70 @@ const reorderCards = async (req, res) => {
       });
     }
 
-    for (const card of cards) {
 
-      await Card.update(
-        {
-          position: card.position,
-        },
-        {
-          where: { id: card.id },
-        }
-      );
+  for (const item of cards) {
 
+  await Card.update(
+    {
+      listId: item.listId,
+      position: item.position,
+    },
+    {
+      where:{
+        id:item.id
+      }
     }
+  );
+
+}
+
 
     return res.status(200).json({
       success: true,
       message: "Cards reordered successfully",
     });
 
-  } catch (error) {
+
+  } catch(error){
 
     console.log("Reorder Cards Error:", error);
+
+    return res.status(500).json({
+      success:false,
+      message:"Internal Server Error",
+    });
+
+  }
+};
+const toggleCardCompleted = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const card = await Card.findByPk(id);
+
+    if (!card) {
+      return res.status(404).json({
+        success: false,
+        message: "Card not found",
+      });
+    }
+
+    card.isCompleted = !card.isCompleted;
+
+    await card.save();
+
+    return res.status(200).json({
+      success: true,
+      card,
+    });
+
+  } catch (error) {
+    console.log("Toggle Card Completed Error:", error);
 
     return res.status(500).json({
       success: false,
       message: "Internal Server Error",
     });
-
   }
 };
 module.exports = {
@@ -488,5 +601,6 @@ module.exports = {
   deleteCard,
   updateDueDate,
   searchCards,
-  reorderCards
+  reorderCards,
+  toggleCardCompleted,
 };

@@ -11,7 +11,8 @@ const {
   deleteCard,
   updateDueDate,
   searchCards,
-  reorderCards
+  reorderCards,
+  toggleCardCompleted,
 } = require("../controllers/cardController");
 
 router.post("/", authMiddleware, createCard);
@@ -22,4 +23,9 @@ router.get("/:listId" , authMiddleware , getCards);
 router.put("/:id" , authMiddleware , updateCard);
 router.delete("/:id" , authMiddleware , deleteCard);
 router.patch("/:id/due-date" , authMiddleware , updateDueDate);
+router.patch(
+  "/:id/toggle-complete",
+  authMiddleware,
+  toggleCardCompleted
+);
 module.exports = router;
