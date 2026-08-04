@@ -221,6 +221,8 @@ const reorderLists = async (req, res) => {
 
     const { lists } = req.body;
 
+    // console.log(lists);
+
     if (!Array.isArray(lists) || lists.length === 0) {
       return res.status(400).json({
         success: false,
