@@ -24,11 +24,13 @@ const checklistRoutes = require("./routes/checklistRoutes");
 const activityRoutes = require("./routes/activityRoutes");
 const attachmentRoutes = require("./routes/attachmentRoutes");
 const uploadRoute = require("./routes/uploadRoute");
+const testRoutes = require('./routes/testRoutes');
 
 app.use(cors());
 app.use(express.json());
 app.use("/uploads", express.static("uploads"));
 app.use("/api/auth", authRoutes);
+app.use("/api/test", testRoutes);
 app.use("/api/workspaces", workspaceRoutes);
 app.use("/api/boards" , boardRoutes);
 app.use("/api/lists", listRoutes);

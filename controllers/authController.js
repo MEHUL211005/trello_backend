@@ -1,6 +1,8 @@
 const User = require("../models/User");
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
+const sendEmail = require("../utils/sendEmail");
 
 const registerUser = async (req, res) => {
   try {
@@ -59,14 +61,43 @@ const registerUser = async (req, res) => {
 
     // Hash Password
     const hashedPassword = await bcrypt.hash(password, 10);
-
+    // Generate verification token
+const verificationToken = crypto.randomBytes(32).toString("hex");
     // Create User
     const user = await User.create({
       name,
       email,
       password: hashedPassword,
+      verificationToken,
     });
+// Verification URL
+const verifyUrl = `http://localhost:5000/api/auth/verify-email/${verificationToken}`;
 
+// Send verification email
+await sendEmail({
+  to: email,
+  subject: "Verify your Trello account",
+  html: `
+    <h2>Welcome to Trello </h2>
+    <p>Please verify your email by clicking the button below:</p>
+
+    <a href="${verifyUrl}"
+       style="
+         display:inline-block;
+         padding:12px 24px;
+         background:#2563eb;
+         color:white;
+         text-decoration:none;
+         border-radius:6px;
+         font-weight:bold;
+       ">
+       Verify Email
+    </a>
+
+    <p>If the button does not work, copy this link:</p>
+    <p>${verifyUrl}</p>
+  `,
+});
     // Success Response
     return res.status(201).json({
       success: true,
@@ -165,8 +196,31 @@ const loginUser = async (req, res) => {
     });
   }
 };
+const verifyEmail = async (req, res) => {
+  try {
+    const { token } = req.params;
 
+    const user = await User.findOne({
+      where: { verificationToken: token },
+    });
+
+    if (!user) {
+      return res.status(400).send("Invalid or expired verification link");
+    }
+
+    user.isVerified = true;
+    user.verificationToken = null;
+
+    await user.save();
+
+    return res.send("Email verified successfully 🎉");
+  } catch (error) {
+    console.error(error);
+    return res.status(500).send("Server error");
+  }
+};
 module.exports = {
   registerUser,
-  loginUser
+  loginUser,
+  verifyEmail,
 };

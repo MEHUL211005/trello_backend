@@ -25,6 +25,27 @@ const User = sequelize.define(
       type: DataTypes.STRING,
       allowNull: false,
     },
+    // Email verification
+    isVerified: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
+
+    verificationToken: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+
+    // Forgot password
+    resetPasswordToken: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+
+    resetPasswordExpires: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
   },
   {
     timestamps: true,
@@ -32,3 +53,4 @@ const User = sequelize.define(
 );
 
 module.exports = User;
+ 
