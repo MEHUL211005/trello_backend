@@ -9,15 +9,13 @@ const {
   updateBoard,
   deleteBoard,
   getBoardById,
+  searchBoards,
 } = require("../controllers/boardController");
 
-router.post(
-  "/",
-  authMiddleware,
-  createBoard
-);
+router.post("/", authMiddleware, createBoard);
+router.get("/search", authMiddleware, searchBoards);
 router.get("/single/:id", authMiddleware, getBoardById);
-router.get("/:workspaceId" , authMiddleware , getBoards);
-router.put("/:id" , authMiddleware , updateBoard);
-router.delete("/:id" , authMiddleware , deleteBoard)
+router.get("/:workspaceId", authMiddleware, getBoards);
+router.put("/:id", authMiddleware, updateBoard);
+router.delete("/:id", authMiddleware, deleteBoard);
 module.exports = router;

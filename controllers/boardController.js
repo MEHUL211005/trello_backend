@@ -1,3 +1,4 @@
+const { Op } = require("sequelize");
 const Board = require("../models/Board");
 const Workspace = require("../models/Workspace");
 const List = require("../models/List");
@@ -8,7 +9,6 @@ const User = require("../models/User");
 const Attachment = require("../models/Attachment");
 const createBoard = async (req, res) => {
   try {
-
     let { name, background, workspaceId } = req.body;
 
     // Required Fields
@@ -49,21 +49,17 @@ const createBoard = async (req, res) => {
       message: "Board created successfully",
       board,
     });
-
   } catch (error) {
-
     console.log("Create Board Error:", error);
 
     return res.status(500).json({
       success: false,
-      message: "Internal Server Error"
+      message: "Internal Server Error",
     });
-
   }
 };
 const getBoards = async (req, res) => {
   try {
-
     const { workspaceId } = req.params;
 
     // Check workspace ownership
@@ -93,21 +89,17 @@ const getBoards = async (req, res) => {
       success: true,
       boards,
     });
-
   } catch (error) {
-
     console.log("Get Boards Error:", error);
 
     return res.status(500).json({
       success: false,
       message: "Internal Server Error",
     });
-
   }
 };
 const updateBoard = async (req, res) => {
   try {
-
     const { id } = req.params;
     const { name, background } = req.body;
 
@@ -153,21 +145,17 @@ const updateBoard = async (req, res) => {
       message: "Board updated successfully",
       board,
     });
-
   } catch (error) {
-
     console.log(error);
 
     return res.status(500).json({
       success: false,
       message: "Internal Server Error",
     });
-
   }
 };
 const deleteBoard = async (req, res) => {
   try {
-
     const { id } = req.params;
 
     const board = await Board.findByPk(id);
@@ -199,18 +187,70 @@ const deleteBoard = async (req, res) => {
       success: true,
       message: "Board deleted successfully",
     });
-
   } catch (error) {
-
     console.log(error);
 
     return res.status(500).json({
       success: false,
       message: "Internal Server Error",
     });
-
   }
 };
+const searchBoards = async (req, res) => {
+  try {
+    const { query } = req.query;
+    const trimmedQuery = query?.trim();
+
+    if (!trimmedQuery) {
+      return res.status(400).json({
+        success: false,
+        message: "Search query is required",
+      });
+    }
+
+    const userWorkspaces = await Workspace.findAll({
+      where: {
+        userId: req.user.id,
+      },
+      attributes: ["id"],
+    });
+
+    const workspaceIds = userWorkspaces.map((workspace) => workspace.id);
+
+    const boards = await Board.findAll({
+      where: {
+        workspaceId: {
+          [Op.in]: workspaceIds,
+        },
+        name: {
+          [Op.like]: `%${trimmedQuery}%`,
+        },
+      },
+      include: [
+        {
+          model: Workspace,
+          as: "workspace",
+          attributes: ["id", "name"],
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+
+    return res.status(200).json({
+      success: true,
+      count: boards.length,
+      boards,
+    });
+  } catch (error) {
+    console.log("Search Boards Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
+  }
+};
+
 const getBoardById = async (req, res) => {
   try {
     const { id } = req.params;
@@ -221,31 +261,31 @@ const getBoardById = async (req, res) => {
           model: List,
           as: "lists",
           include: [
-           {
-  model: Card,
-  as: "cards",
-  include: [
-    {
-      model: User,
-      as: "members",
-      attributes: ["id", "name", "email"],
-      through: { attributes: [] },
-    },
+            {
+              model: Card,
+              as: "cards",
+              include: [
+                {
+                  model: User,
+                  as: "members",
+                  attributes: ["id", "name", "email"],
+                  through: { attributes: [] },
+                },
 
-    {
-      model: Checklist,
-      include: [
-        {
-          model: ChecklistItem,
-        },
-      ],
-    },
+                {
+                  model: Checklist,
+                  include: [
+                    {
+                      model: ChecklistItem,
+                    },
+                  ],
+                },
 
-    {
-      model: Attachment,
-    },
-  ],
-}
+                {
+                  model: Attachment,
+                },
+              ],
+            },
           ],
         },
       ],
@@ -276,16 +316,13 @@ const getBoardById = async (req, res) => {
       success: true,
       board,
     });
-
   } catch (error) {
-
     console.log("Get Board Error:", error);
 
     return res.status(500).json({
       success: false,
       message: "Internal Server Error",
     });
-
   }
 };
 module.exports = {
@@ -294,4 +331,5 @@ module.exports = {
   updateBoard,
   deleteBoard,
   getBoardById,
+  searchBoards,
 };
