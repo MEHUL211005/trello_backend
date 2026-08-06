@@ -11,6 +11,12 @@ const Board = sequelize.define("Board", {
     type: DataTypes.STRING,
     allowNull: true,
   },
+
+  isStarred: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false,
+    allowNull: false,
+  },
 });
 
 module.exports = Board;

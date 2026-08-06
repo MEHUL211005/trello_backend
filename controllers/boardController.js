@@ -13,7 +13,7 @@ const createBoard = async (req, res) => {
 
     // Required Fields
     if (!name || !workspaceId) {
-      
+
       return res.status(400).json({
         success: false,
         message: "Name and Workspace ID are required",
@@ -326,6 +326,44 @@ const getBoardById = async (req, res) => {
     });
   }
 };
+const toggleStarBoard = async (req, res) => {
+  try {
+
+    const { id } = req.params;
+
+    const board = await Board.findByPk(id);
+
+    if (!board) {
+      return res.status(404).json({
+        success: false,
+        message: "Board not found",
+      });
+    }
+
+
+    board.isStarred = !board.isStarred;
+
+    await board.save();
+
+
+    return res.status(200).json({
+      success: true,
+      message: "Board star updated",
+      board,
+    });
+
+
+  } catch (error) {
+
+    console.log("Toggle star error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+    });
+
+  }
+};
 module.exports = {
   createBoard,
   getBoards,
@@ -333,4 +371,5 @@ module.exports = {
   deleteBoard,
   getBoardById,
   searchBoards,
+  toggleStarBoard,
 };
