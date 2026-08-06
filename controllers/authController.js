@@ -4,6 +4,31 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const sendEmail = require("../utils/sendEmail");
 
+const generateAccessToken = (user) => {
+  return jwt.sign(
+    {
+      id: user.id,
+      email: user.email,
+    },
+    process.env.JWT_SECRET,
+    {
+      expiresIn: '15m',
+    }
+  );
+};
+
+const generateRefreshToken = (user) => {
+  return jwt.sign(
+    {
+      id: user.id,
+    },
+    process.env.JWT_REFRESH_SECRET,
+    {
+      expiresIn: '7d',
+    }
+  );
+};
+//register
 const registerUser = async (req, res) => {
   try {
     let { name, email, password } = req.body;
@@ -162,37 +187,143 @@ const loginUser = async (req, res) => {
       });
     }
 
-    // Generate JWT Token
-    const token = jwt.sign(
-      {
-        id: user.id,
-        email: user.email,
-      },
-      process.env.JWT_SECRET,
-      {
-        expiresIn: "7d",
-      }
-    );
+    // Generate tokens
+const accessToken = generateAccessToken(user);
+const refreshToken = generateRefreshToken(user);
 
+// Save refresh token in DB
+user.refreshToken = refreshToken;
+await user.save();
 
-    // Success Response
-    return res.status(200).json({
-      success: true,
-      message: "Login successful",
-      token,
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-      },
-    });
+// Send refresh token as HttpOnly cookie
+res.cookie("refreshToken", refreshToken, {
+  httpOnly: true,
+  secure: false, // change to true in production with HTTPS
+  sameSite: "lax",
+  maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+});
 
+// Success Response
+return res.status(200).json({
+  success: true,
+  message: "Login successful",
+  accessToken,
+  user: {
+    id: user.id,
+    name: user.name,
+    email: user.email,
+  },
+});
   } catch (error) {
     console.error("Login Error:", error);
 
     return res.status(500).json({
       success: false,
       message: "Internal Server Error",
+    });
+  }
+};
+const refreshAccessToken = async (req, res) => {
+  try {
+    // Read refresh token from cookie
+    const refreshToken = req.cookies.refreshToken;
+
+    if (!refreshToken) {
+      return res.status(401).json({
+        success: false,
+        message: "Refresh token missing",
+      });
+    }
+
+    // Verify refresh token
+    const decoded = jwt.verify(
+      refreshToken,
+      process.env.JWT_REFRESH_SECRET
+    );
+
+    // Find user
+    const user = await User.findByPk(decoded.id);
+
+    if (!user || user.refreshToken !== refreshToken) {
+      return res.status(403).json({
+        success: false,
+        message: "Invalid refresh token",
+      });
+    }
+
+    // Create new access token
+    const newAccessToken = generateAccessToken(user);
+
+    return res.json({
+      success: true,
+      accessToken: newAccessToken,
+    });
+
+  } catch (error) {
+    return res.status(403).json({
+      success: false,
+      message: "Invalid or expired refresh token",
+    });
+  }
+};
+const logoutUser = async (req, res) => {
+  try {
+    // Read refresh token from cookie
+    const refreshToken = req.cookies.refreshToken;
+
+    // Remove refresh token from DB
+    if (refreshToken) {
+      const user = await User.findOne({
+        where: { refreshToken },
+      });
+
+      if (user) {
+        user.refreshToken = null;
+        await user.save();
+      }
+    }
+
+    // Clear cookie
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: false,
+      sameSite: "lax",
+    });
+
+    return res.json({
+      success: true,
+      message: "Logged out successfully",
+    });
+
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
+    });
+  }
+};
+const getProfile = async (req, res) => {
+  try {
+    const user = await User.findByPk(req.user.id, {
+      attributes: ["id", "name", "email", "createdAt", "updatedAt"],
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    return res.json({
+      success: true,
+      user,
+    });
+
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Server error",
     });
   }
 };
@@ -222,5 +353,8 @@ const verifyEmail = async (req, res) => {
 module.exports = {
   registerUser,
   loginUser,
+  refreshAccessToken,
+  logoutUser,
+  getProfile,
   verifyEmail,
 };
