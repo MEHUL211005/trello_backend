@@ -13,6 +13,7 @@ const createBoard = async (req, res) => {
 
     // Required Fields
     if (!name || !workspaceId) {
+      
       return res.status(400).json({
         success: false,
         message: "Name and Workspace ID are required",

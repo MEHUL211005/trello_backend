@@ -26,7 +26,7 @@ const activityRoutes = require("./routes/activityRoutes");
 const attachmentRoutes = require("./routes/attachmentRoutes");
 const uploadRoute = require("./routes/uploadRoute");
 const testRoutes = require('./routes/testRoutes');
-
+const feedbackRoutes = require("./routes/feedbackRoutes");
 app.use(cors({
   origin: process.env.CLIENT_URL,
   credentials: true,
@@ -47,6 +47,7 @@ app.use("/api/checklists" , checklistRoutes);
 app.use("/api/activities" , activityRoutes);
 app.use("/api/attachments" , attachmentRoutes);
 app.use("/api/upload", uploadRoute);
+app.use("/api/feedback", feedbackRoutes);
 sequelize
   .authenticate()
   .then(async () => {
