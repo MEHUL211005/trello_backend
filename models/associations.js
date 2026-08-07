@@ -10,6 +10,7 @@ const ChecklistItem = require("./ChecklistItem");
 const Activity = require("./Activity");
 const Attachment = require("./Attachment");
 const Feedback = require("./Feedback");
+const BoardMember = require("./BoardMember");
 // User -> Workspace
 User.hasMany(Workspace, {
   foreignKey: "userId",
@@ -163,6 +164,24 @@ Feedback.belongsTo(User,{
   foreignKey:"userId",
   as:"user",
 });
+
+Board.hasMany(BoardMember, {
+  foreignKey: "boardId",
+  as: "boardMembers",
+});
+
+BoardMember.belongsTo(Board, {
+  foreignKey: "boardId",
+});
+
+User.hasMany(BoardMember, {
+  foreignKey: "userId",
+  as: "boardMemberships",
+});
+
+BoardMember.belongsTo(User, {
+  foreignKey: "userId",
+});
 module.exports = {
   User,
   Workspace,
@@ -175,5 +194,6 @@ module.exports = {
   ChecklistItem,
   Activity,
   Attachment,
-  Feedback
+  Feedback,
+  BoardMember,
 };

@@ -10,6 +10,7 @@ const List = require("./models/List");
 const Board = require("./models/Board");
 const Card = require("./models/Card");
 const Label = require("./models/Label");
+const BoardMember = require("./models/BoardMember");
 require("./models/associations");
 
 const cookieParser = require('cookie-parser');
