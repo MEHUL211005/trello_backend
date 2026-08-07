@@ -11,6 +11,7 @@ const {
   getBoardById,
   searchBoards,
   toggleStarBoard,
+  filterBoardCards,
 } = require("../controllers/boardController");
 
 router.post("/", authMiddleware, createBoard);
@@ -20,4 +21,6 @@ router.get("/:workspaceId", authMiddleware, getBoards);
 router.put("/:id", authMiddleware, updateBoard);
 router.delete("/:id", authMiddleware, deleteBoard);
 router.patch("/:id/star", toggleStarBoard);
+router.get("/:id/filter", authMiddleware, filterBoardCards);
 module.exports = router;
+
