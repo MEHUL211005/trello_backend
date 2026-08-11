@@ -1,7 +1,7 @@
 const { Op } = require("sequelize");
 const Workspace = require("../models/Workspace");
 const Board = require("../models/Board");
-
+const BoardMember = require("../models/BoardMember");
 const createWorkspace = async (req, res) => {
   try {
     const { name, description } = req.body;
@@ -37,7 +37,8 @@ const createWorkspace = async (req, res) => {
 };
 const getWorkspaces = async (req, res) => {
   try {
-    const workspaces = await Workspace.findAll({
+    // Workspaces owned by the user
+    const ownedWorkspaces = await Workspace.findAll({
       where: {
         userId: req.user.id,
       },
@@ -49,6 +50,36 @@ const getWorkspaces = async (req, res) => {
       ],
       order: [["createdAt", "DESC"]],
     });
+
+    // Workspaces where the user is a member of at least one board
+    const sharedWorkspaces = await Workspace.findAll({
+      include: [
+        {
+          model: Board,
+          as: "boards",
+          include: [
+            {
+              model: BoardMember,
+              as: "boardMembers",
+              where: {
+                userId: req.user.id,
+              },
+              attributes: [],
+            },
+          ],
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+
+    // Merge and remove duplicates
+    const workspaceMap = new Map();
+
+    [...ownedWorkspaces, ...sharedWorkspaces].forEach((workspace) => {
+      workspaceMap.set(workspace.id, workspace);
+    });
+
+    const workspaces = Array.from(workspaceMap.values());
 
     return res.status(200).json({
       success: true,

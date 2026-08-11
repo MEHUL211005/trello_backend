@@ -15,7 +15,7 @@ const BoardMember = sequelize.define(
     },
 
     role: {
-      type: DataTypes.ENUM("OWNER", "ADMIN", "MEMBER", "VIEWER"),
+      type:DataTypes.ENUM("OWNER", "MEMBER", "VIEWER"),
       allowNull: false,
       defaultValue: "MEMBER",
     },

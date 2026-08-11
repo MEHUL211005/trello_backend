@@ -12,6 +12,8 @@ const {
   searchBoards,
   toggleStarBoard,
   filterBoardCards,
+  inviteToBoard,
+  getBoardMembers,
 } = require("../controllers/boardController");
 
 router.post("/", authMiddleware, createBoard);
@@ -22,5 +24,7 @@ router.put("/:id", authMiddleware, updateBoard);
 router.delete("/:id", authMiddleware, deleteBoard);
 router.patch("/:id/star", toggleStarBoard);
 router.get("/:id/filter", authMiddleware, filterBoardCards);
+router.post("/:id/invite", authMiddleware, inviteToBoard);
+router.get("/:id/members", authMiddleware, getBoardMembers);
 module.exports = router;
 
