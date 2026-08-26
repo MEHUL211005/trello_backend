@@ -57,6 +57,7 @@ const getWorkspaces = async (req, res) => {
         {
           model: Board,
           as: "boards",
+          required: true,
           include: [
             {
               model: BoardMember,
@@ -65,6 +66,7 @@ const getWorkspaces = async (req, res) => {
                 userId: req.user.id,
               },
               attributes: [],
+              required: true,
             },
           ],
         },
