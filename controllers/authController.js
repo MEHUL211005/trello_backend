@@ -99,30 +99,30 @@ const verificationToken = crypto.randomBytes(32).toString("hex");
 const verifyUrl = `http://localhost:5000/api/auth/verify-email/${verificationToken}`;
 
 // Send verification email
-await sendEmail({
-  to: email,
-  subject: "Verify your Trello account",
-  html: `
-    <h2>Welcome to Trello </h2>
-    <p>Please verify your email by clicking the button below:</p>
+// await sendEmail({
+//   to: email,
+//   subject: "Verify your Trello account",
+//   html: `
+//     <h2>Welcome to Trello </h2>
+//     <p>Please verify your email by clicking the button below:</p>
 
-    <a href="${verifyUrl}"
-       style="
-         display:inline-block;
-         padding:12px 24px;
-         background:#2563eb;
-         color:white;
-         text-decoration:none;
-         border-radius:6px;
-         font-weight:bold;
-       ">
-       Verify Email
-    </a>
+//     <a href="${verifyUrl}"
+//        style="
+//          display:inline-block;
+//          padding:12px 24px;
+//          background:#2563eb;
+//          color:white;
+//          text-decoration:none;
+//          border-radius:6px;
+//          font-weight:bold;
+//        ">
+//        Verify Email
+//     </a>
 
-    <p>If the button does not work, copy this link:</p>
-    <p>${verifyUrl}</p>
-  `,
-});
+//     <p>If the button does not work, copy this link:</p>
+//     <p>${verifyUrl}</p>
+//   `,
+// });
     // Success Response
     return res.status(201).json({
       success: true,
