@@ -2,6 +2,22 @@ const express = require("express");
 const cors = require("cors");
 require("dotenv").config();
 const app = express();
+
+// Request Logger Middleware (logs all incoming hits from localhost, domain, curl, etc.)
+app.use((req, res, next) => {
+  const start = Date.now();
+  const origin = req.headers.origin || req.headers.host || "unknown";
+
+  res.on("finish", () => {
+    const duration = Date.now() - start;
+    const timestamp = new Date().toLocaleTimeString();
+    console.log(
+      `📩 [${timestamp}] ${req.method} ${req.originalUrl} -> Status: ${res.statusCode} (${duration}ms) | Origin: ${origin}`
+    );
+  });
+
+  next();
+});
 const sequelize = require("./config/database");
 
 const User = require("./models/User");
@@ -44,7 +60,12 @@ const allowedOrigins = [...new Set([...envOrigins, ...defaultOrigins])];
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (
+        !origin ||
+        allowedOrigins.includes(origin) ||
+        origin.endsWith(".devopswithyogesh.host") ||
+        origin.includes("localhost")
+      ) {
         return callback(null, true);
       }
       return callback(null, false);
