@@ -226,7 +226,7 @@ return res.status(200).json({
 const refreshAccessToken = async (req, res) => {
   try {
     // Read refresh token from cookie
-    const refreshToken = req.cookies.refreshToken;
+    const refreshToken = req.cookies?.refreshToken;
 
     if (!refreshToken) {
       return res.status(401).json({

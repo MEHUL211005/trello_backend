@@ -28,13 +28,41 @@ const attachmentRoutes = require("./routes/attachmentRoutes");
 const uploadRoute = require("./routes/uploadRoute");
 const testRoutes = require('./routes/testRoutes');
 const feedbackRoutes = require("./routes/feedbackRoutes");
-app.use(cors({
-  origin: process.env.CLIENT_URL,
-  credentials: true,
-}));
+// Allow origin sanitization (strips path and trailing slashes if present)
+const defaultOrigins = ["http://localhost:3000", "http://localhost:5173"];
+const envOrigins = process.env.CLIENT_URL
+  ? process.env.CLIENT_URL.split(",").map((url) => {
+      try {
+        return new URL(url.trim()).origin;
+      } catch {
+        return url.trim().replace(/\/+$/, "");
+      }
+    })
+  : [];
+const allowedOrigins = [...new Set([...envOrigins, ...defaultOrigins])];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      return callback(null, false);
+    },
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use(cookieParser());
 app.use("/uploads", express.static("uploads"));
+
+app.get("/", (req, res) => {
+  res.json({
+    message: "Trello Backend is running successfully! 🚀",
+    status: "OK",
+  });
+});
+
 app.use("/api/auth", authRoutes);
 app.use("/api/test", testRoutes);
 app.use("/api/workspaces", workspaceRoutes);
