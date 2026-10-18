@@ -1,3 +1,4 @@
+const { getBoardRole, canRead, canWrite, denied } = require("../utils/boardAccess");
 const Label = require("../models/Label");
 const Board = require("../models/Board");
 const Workspace = require("../models/Workspace");
@@ -30,18 +31,9 @@ const createLabel = async (req, res) => {
     }
 
     // Verify ownership
-    const workspace = await Workspace.findOne({
-      where: {
-        id: board.workspaceId,
-        userId: req.user.id,
-      },
-    });
-
-    if (!workspace) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
+    const role = await getBoardRole(req.user.id, board);
+    if (!canWrite(role)) {
+      return denied(res);
     }
 
     // Prevent duplicate colors in same board
@@ -84,6 +76,8 @@ const createLabel = async (req, res) => {
   }
 };
 const Card = require("../models/Card");
+const createActivity = require("../utils/createActivity");
+
 const List = require("../models/List");
 
 const toggleLabel = async (req, res) => {
@@ -115,18 +109,9 @@ const toggleLabel = async (req, res) => {
     const list = await List.findByPk(card.listId);
     const board = await Board.findByPk(list.boardId);
 
-    const workspace = await Workspace.findOne({
-      where: {
-        id: board.workspaceId,
-        userId: req.user.id,
-      },
-    });
-
-    if (!workspace) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
+    const role = await getBoardRole(req.user.id, board);
+    if (!canWrite(role)) {
+      return denied(res);
     }
 
     // Check if label already attached
@@ -136,6 +121,7 @@ const toggleLabel = async (req, res) => {
 
       // Remove label
       await card.removeLabel(label);
+      await createActivity(`removed the label "${label.name}"`, card.id, req.user.id);
 
       return res.status(200).json({
         success: true,
@@ -147,6 +133,7 @@ const toggleLabel = async (req, res) => {
 
       // Add label
       await card.addLabel(label);
+      await createActivity(`added the label "${label.name}"`, card.id, req.user.id);
 
       return res.status(200).json({
         success: true,
@@ -183,18 +170,9 @@ const getBoardLabels = async (req, res) => {
     }
 
     // Verify ownership
-    const workspace = await Workspace.findOne({
-      where: {
-        id: board.workspaceId,
-        userId: req.user.id,
-      },
-    });
-
-    if (!workspace) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
+    const role = await getBoardRole(req.user.id, board);
+    if (!canRead(role)) {
+      return denied(res);
     }
 
     // Get labels of this board
@@ -247,18 +225,9 @@ const getCardLabels = async (req, res) => {
     const list = await List.findByPk(card.listId);
     const board = await Board.findByPk(list.boardId);
 
-    const workspace = await Workspace.findOne({
-      where: {
-        id: board.workspaceId,
-        userId: req.user.id,
-      },
-    });
-
-    if (!workspace) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
+    const role = await getBoardRole(req.user.id, board);
+    if (!canRead(role)) {
+      return denied(res);
     }
 
     return res.status(200).json({

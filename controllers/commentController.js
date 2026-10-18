@@ -1,3 +1,10 @@
+const {
+  getBoardRole,
+  getCardAccess,
+  canRead,
+  canWrite,
+  denied,
+} = require("../utils/boardAccess");
 const Comment = require("../models/Comment");
 const Card = require("../models/Card");
 const List = require("../models/List");
@@ -34,18 +41,9 @@ const addComment = async (req, res) => {
     const list = await List.findByPk(card.listId);
     const board = await Board.findByPk(list.boardId);
 
-    const workspace = await Workspace.findOne({
-      where: {
-        id: board.workspaceId,
-        userId: req.user.id,
-      },
-    });
-
-    if (!workspace) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
+    const role = await getBoardRole(req.user.id, board);
+    if (!canWrite(role)) {
+      return denied(res);
     }
 
     // Create comment
@@ -94,18 +92,9 @@ const getComments = async (req, res) => {
     const list = await List.findByPk(card.listId);
     const board = await Board.findByPk(list.boardId);
 
-    const workspace = await Workspace.findOne({
-      where: {
-        id: board.workspaceId,
-        userId: req.user.id,
-      },
-    });
-
-    if (!workspace) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
+    const role = await getBoardRole(req.user.id, board);
+    if (!canRead(role)) {
+      return denied(res);
     }
 
     // Get comments with author
@@ -159,7 +148,15 @@ const deleteComment = async (req, res) => {
       });
     }
 
+    // Access may have been reduced since the comment was written
+    const { role } = await getCardAccess(req.user.id, comment.cardId);
+    if (!canWrite(role)) {
+      return denied(res);
+    }
+
     await comment.destroy();
+
+    await createActivity("deleted a comment", comment.cardId, req.user.id);
 
     return res.status(200).json({
       success: true,
@@ -203,6 +200,12 @@ const updateComment = async (req, res) => {
         success: false,
         message: "You can edit only your own comments",
       });
+    }
+
+    // Access may have been reduced since the comment was written
+    const { role } = await getCardAccess(req.user.id, comment.cardId);
+    if (!canWrite(role)) {
+      return denied(res);
     }
 
     comment.text = text.trim();

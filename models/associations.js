@@ -10,7 +10,10 @@ const ChecklistItem = require("./ChecklistItem");
 const Activity = require("./Activity");
 const Attachment = require("./Attachment");
 const Feedback = require("./Feedback");
+const PlannerTask = require("./PlannerTask");
 const BoardMember = require("./BoardMember");
+const BoardInvitation = require("./BoardInvitation");
+const BoardStar = require("./BoardStar");
 // User -> Workspace
 User.hasMany(Workspace, {
   foreignKey: "userId",
@@ -22,9 +25,13 @@ Workspace.belongsTo(User, {
   foreignKey: "userId",
 });
 
+// hooks: true makes Sequelize delete the children itself, so existing
+// tables (whose foreign keys were created without CASCADE) are cleaned up too
 Workspace.hasMany(Board,{
  foreignKey:"workspaceId",
- as:"boards"
+ as:"boards",
+ onDelete:"CASCADE",
+ hooks:true,
 });
 
 Board.belongsTo(Workspace,{
@@ -35,6 +42,8 @@ Board.belongsTo(Workspace,{
 Board.hasMany(List, {
   foreignKey: "boardId",
   as: "lists",
+  onDelete: "CASCADE",
+  hooks: true,
 });
 
 List.belongsTo(Board, {
@@ -44,6 +53,7 @@ List.belongsTo(Board, {
 List.hasMany(Card, {
   foreignKey: "listId",
   onDelete: "CASCADE",
+  hooks: true,
   as: "cards",
 });
 
@@ -55,6 +65,7 @@ Card.belongsTo(List, {
 Board.hasMany(Label, {
   foreignKey: "boardId",
   onDelete: "CASCADE",
+  hooks: true,
 });
 
 // Label -> Board
@@ -165,9 +176,23 @@ Feedback.belongsTo(User,{
   as:"user",
 });
 
+// Planner tasks go away with their owner
+User.hasMany(PlannerTask, {
+  foreignKey: "userId",
+  as: "plannerTasks",
+  onDelete: "CASCADE",
+});
+
+PlannerTask.belongsTo(User, {
+  foreignKey: "userId",
+  as: "user",
+});
+
 Board.hasMany(BoardMember, {
   foreignKey: "boardId",
   as: "boardMembers",
+  onDelete: "CASCADE",
+  hooks: true,
 });
 
 BoardMember.belongsTo(Board, {
@@ -182,6 +207,37 @@ User.hasMany(BoardMember, {
 BoardMember.belongsTo(User, {
   foreignKey: "userId",
 });
+Board.hasMany(BoardInvitation, {
+  foreignKey: "boardId",
+  as: "invitations",
+  onDelete: "CASCADE",
+  hooks: true,
+});
+BoardInvitation.belongsTo(Board, {
+  foreignKey: "boardId",
+});
+BoardInvitation.belongsTo(User, {
+  foreignKey: "invitedBy",
+  as: "inviter",
+});
+
+Board.hasMany(BoardStar, {
+  foreignKey: "boardId",
+  as: "stars",
+  onDelete: "CASCADE",
+  hooks: true,
+});
+BoardStar.belongsTo(Board, {
+  foreignKey: "boardId",
+});
+BoardStar.belongsTo(User, {
+  foreignKey: "userId",
+});
+User.hasMany(BoardStar, {
+  foreignKey: "userId",
+  onDelete: "CASCADE",
+});
+
 module.exports = {
   User,
   Workspace,
@@ -195,5 +251,6 @@ module.exports = {
   Activity,
   Attachment,
   Feedback,
+  PlannerTask,
   BoardMember,
 };

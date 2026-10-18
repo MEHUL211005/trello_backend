@@ -8,7 +8,12 @@ const {
   refreshAccessToken,
   logoutUser,
   getProfile,
-  verifyEmail,
+  updateProfile,
+  changePassword,
+  verifyOtp,
+  resendOtp,
+  forgotPassword,
+  resetPassword,
 } = require("../controllers/authController");
 
 router.post("/register", registerUser);
@@ -19,8 +24,18 @@ router.post("/refresh" , refreshAccessToken);
 
 router.post("/logout", logoutUser);
 
-router.get('/verify-email/:token', verifyEmail);
+router.post("/verify-otp", verifyOtp);
+
+router.post("/resend-otp", resendOtp);
+
+router.post("/forgot-password", forgotPassword);
+
+router.post("/reset-password", resetPassword);
 
 router.get("/profile", authMiddleware, getProfile);
+
+router.put("/profile", authMiddleware, updateProfile);
+
+router.post("/change-password", authMiddleware, changePassword);
 
 module.exports = router;

@@ -51,37 +51,9 @@ const getWorkspaces = async (req, res) => {
       order: [["createdAt", "DESC"]],
     });
 
-    // Workspaces where the user is a member of at least one board
-    const sharedWorkspaces = await Workspace.findAll({
-      include: [
-        {
-          model: Board,
-          as: "boards",
-          required: true,
-          include: [
-            {
-              model: BoardMember,
-              as: "boardMembers",
-              where: {
-                userId: req.user.id,
-              },
-              attributes: [],
-              required: true,
-            },
-          ],
-        },
-      ],
-      order: [["createdAt", "DESC"]],
-    });
-
-    // Merge and remove duplicates
-    const workspaceMap = new Map();
-
-    [...ownedWorkspaces, ...sharedWorkspaces].forEach((workspace) => {
-      workspaceMap.set(workspace.id, workspace);
-    });
-
-    const workspaces = Array.from(workspaceMap.values());
+    // Boards other people shared with this user are listed separately
+    // (GET /boards/shared), so only the user's own workspaces appear here.
+    const workspaces = ownedWorkspaces;
 
     return res.status(200).json({
       success: true,

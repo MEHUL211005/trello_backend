@@ -15,6 +15,13 @@ const Feedback = sequelize.define(
       allowNull: false,
     },
 
+    // IDEA, BUG, PRAISE or OTHER
+    category: {
+      type: DataTypes.STRING(20),
+      allowNull: false,
+      defaultValue: "OTHER",
+    },
+
     message: {
       type: DataTypes.TEXT,
       allowNull: false,

@@ -36,6 +36,28 @@ const User = sequelize.define(
       allowNull: true,
     },
 
+    // Signup OTP (only a hash of the code is stored)
+    otpHash: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+
+    otpExpires: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+
+    otpSentAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+
+    otpAttempts: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+      defaultValue: 0,
+    },
+
     // Forgot password
     resetPasswordToken: {
       type: DataTypes.STRING,

@@ -7,8 +7,21 @@ const Checklist = require("../models/Checklist");
 const ChecklistItem = require("../models/ChecklistItem");
 const User = require("../models/User");
 const Attachment = require("../models/Attachment");
+const Comment = require("../models/Comment");
 const Label = require("../models/Label");
 const BoardMember = require ("../models/BoardMember");
+const BoardStar = require("../models/BoardStar");
+const { normalizeBackground } = require("../utils/boardBackgrounds");
+const { withStars, starredSet } = require("../utils/stars");
+const {
+  getBoardRole,
+  getAccessibleBoardIds,
+  roleLabel,
+  canRead,
+  canWrite,
+  canAdmin,
+  denied,
+} = require("../utils/boardAccess");
 const createBoard = async (req, res) => {
   try {
     let { name, background, workspaceId } = req.body;
@@ -23,6 +36,15 @@ const createBoard = async (req, res) => {
 
     // Remove extra spaces
     name = name.trim();
+
+    const chosen = normalizeBackground(background);
+    if (!chosen.ok) {
+      return res.status(400).json({
+        success: false,
+        message: "That background is not available",
+      });
+    }
+    background = chosen.value;
 
     // Find Workspace
     const workspace = await Workspace.findOne({
@@ -56,7 +78,7 @@ await BoardMember.create({
 return res.status(201).json({
   success: true,
   message: "Board created successfully",
-  board,
+  board: { ...board.toJSON(), isStarred: false },
 });
   } catch (error) {
     console.log("Create Board Error:", error);
@@ -92,7 +114,7 @@ const getBoards = async (req, res) => {
 
       return res.status(200).json({
         success: true,
-        boards,
+        boards: await withStars(req.user.id, boards),
       });
     }
 
@@ -117,7 +139,7 @@ const getBoards = async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      boards,
+      boards: await withStars(req.user.id, boards),
     });
   } catch (error) {
     console.log("Get Boards Error:", error);
@@ -131,9 +153,19 @@ const getBoards = async (req, res) => {
 const updateBoard = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, background } = req.body;
+    const { name } = req.body;
+    const chosen = normalizeBackground(req.body.background);
 
-    if (!name) {
+    if (!chosen.ok) {
+      return res.status(400).json({
+        success: false,
+        message: "That background is not available",
+      });
+    }
+
+    const background = chosen.value;
+
+    if (name !== undefined && !String(name).trim()) {
       return res.status(400).json({
         success: false,
         message: "Board name is required",
@@ -151,29 +183,28 @@ const updateBoard = async (req, res) => {
     }
 
     // Verify ownership
-    const workspace = await Workspace.findOne({
-      where: {
-        id: board.workspaceId,
-        userId: req.user.id,
-      },
-    });
-
-    if (!workspace) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
+    const role = await getBoardRole(req.user.id, board);
+    if (!canAdmin(role)) {
+      return denied(res);
     }
 
-    board.name = name.trim();
-    board.background = background;
+    // Only change the fields that were sent
+    if (name !== undefined) {
+      board.name = name.trim();
+    }
+
+    if (background !== undefined) {
+      board.background = background;
+    }
 
     await board.save();
+
+    const [withStar] = await withStars(req.user.id, [board]);
 
     return res.status(200).json({
       success: true,
       message: "Board updated successfully",
-      board,
+      board: withStar,
     });
   } catch (error) {
     console.log(error);
@@ -197,18 +228,9 @@ const deleteBoard = async (req, res) => {
       });
     }
 
-    const workspace = await Workspace.findOne({
-      where: {
-        id: board.workspaceId,
-        userId: req.user.id,
-      },
-    });
-
-    if (!workspace) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
+    const role = await getBoardRole(req.user.id, board);
+    if (!canAdmin(role)) {
+      return denied(res);
     }
 
     await board.destroy();
@@ -238,19 +260,13 @@ const searchBoards = async (req, res) => {
       });
     }
 
-    const userWorkspaces = await Workspace.findAll({
-      where: {
-        userId: req.user.id,
-      },
-      attributes: ["id"],
-    });
-
-    const workspaceIds = userWorkspaces.map((workspace) => workspace.id);
+    // Boards the user owns or has been invited to
+    const boardIds = await getAccessibleBoardIds(req.user.id);
 
     const boards = await Board.findAll({
       where: {
-        workspaceId: {
-          [Op.in]: workspaceIds,
+        id: {
+          [Op.in]: boardIds,
         },
         name: {
           [Op.like]: `%${trimmedQuery}%`,
@@ -269,7 +285,7 @@ const searchBoards = async (req, res) => {
     return res.status(200).json({
       success: true,
       count: boards.length,
-      boards,
+      boards: await withStars(req.user.id, boards),
     });
   } catch (error) {
     console.log("Search Boards Error:", error);
@@ -290,10 +306,14 @@ const getBoardById = async (req, res) => {
         {
           model: List,
           as: "lists",
+          where: { isArchived: false },
+          required: false,
           include: [
             {
               model: Card,
               as: "cards",
+              where: { isArchived: false },
+              required: false,
               include: [
                 {
                   model: User,
@@ -315,6 +335,11 @@ const getBoardById = async (req, res) => {
                   model: Attachment,
                 },
                 {
+                  // Only the ids: the card shows how many comments it has
+                  model: Comment,
+                  attributes: ["id"],
+                },
+                {
                   model: Label,
                   attributes: ["id", "name", "color"],
                   through: { attributes: [] },
@@ -333,41 +358,31 @@ const getBoardById = async (req, res) => {
       });
     }
 
-    // Check if user owns the workspace
-    const workspace = await Workspace.findOne({
-      where: {
-        id: board.workspaceId,
-        userId: req.user.id,
-      },
-    });
+    // Owners and invited members can view the board
+    const role = await getBoardRole(req.user.id, board);
 
-    // Owner has access
-    if (workspace) {
-      return res.status(200).json({
-        success: true,
-        board,
-      });
+    if (!canRead(role)) {
+      return denied(res);
     }
 
-    // Check if user is a member of this board
-    const boardMember = await BoardMember.findOne({
-      where: {
-        boardId: board.id,
-        userId: req.user.id,
-      },
+    // Who owns the board (shown to people it is shared with)
+    const ownerWorkspace = await Workspace.findByPk(board.workspaceId, {
+      attributes: ["userId"],
     });
+    const owner = ownerWorkspace
+      ? await User.findByPk(ownerWorkspace.userId, {
+          attributes: ["id", "name", "email"],
+        })
+      : null;
 
-    if (!boardMember) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
-    }
+    const [starredBoard] = await withStars(req.user.id, [board]);
 
-    // Board member has access
     return res.status(200).json({
       success: true,
-      board,
+      board: starredBoard,
+      role: roleLabel(role),
+      isShared: role !== "OWNER",
+      owner,
     });
   } catch (error) {
     console.log("Get Board Error:", error);
@@ -398,10 +413,14 @@ const filterBoardCards = async (req, res) => {
         {
           model: List,
           as: "lists",
+          where: { isArchived: false },
+          required: false,
           include: [
             {
               model: Card,
               as: "cards",
+              where: { isArchived: false },
+              required: false,
               include: [
                 {
                   model: User,
@@ -415,6 +434,11 @@ const filterBoardCards = async (req, res) => {
                 },
                 {
                   model: Attachment,
+                },
+                {
+                  // Only the ids: the card shows how many comments it has
+                  model: Comment,
+                  attributes: ["id"],
                 },
                 {
                   model: Label,
@@ -435,18 +459,9 @@ const filterBoardCards = async (req, res) => {
       });
     }
 
-    const workspace = await Workspace.findOne({
-      where: {
-        id: board.workspaceId,
-        userId: req.user.id,
-      },
-    });
-
-    if (!workspace) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
+    const role = await getBoardRole(req.user.id, board);
+    if (!canRead(role)) {
+      return denied(res);
     }
 
     const now = new Date();
@@ -564,14 +579,34 @@ const toggleStarBoard = async (req, res) => {
       });
     }
 
-    board.isStarred = !board.isStarred;
+    // Anyone who can see a board may star it for themselves
+    const role = await getBoardRole(req.user.id, board);
+    if (!canRead(role)) {
+      return denied(res);
+    }
 
-    await board.save();
+    const existing = await BoardStar.findOne({
+      where: { boardId: board.id, userId: req.user.id },
+    });
+
+    // The client says which state it wants, so a repeated or racing click
+    // can't flip it back. Without a value it simply toggles.
+    const wanted =
+      typeof req.body?.starred === "boolean" ? req.body.starred : !existing;
+
+    if (wanted && !existing) {
+      await BoardStar.create({ boardId: board.id, userId: req.user.id });
+    } else if (!wanted && existing) {
+      await existing.destroy();
+    }
+
+    const isStarred = wanted;
 
     return res.status(200).json({
       success: true,
-      message: "Board star updated",
-      board,
+      message: isStarred ? "Board starred" : "Star removed",
+      isStarred,
+      board: { ...board.toJSON(), isStarred },
     });
   } catch (error) {
     console.log("Toggle star error:", error);
@@ -582,116 +617,160 @@ const toggleStarBoard = async (req, res) => {
     });
   }
 };
-const inviteToBoard = async (req, res) => {
+// GET /boards/starred - every board I starred, own or shared with me
+const getStarredBoards = async (req, res) => {
   try {
-    const { id } = req.params;
-    const { email, role = "MEMBER" } = req.body;
-
-    // 1. Find board
-    const board = await Board.findByPk(id);
-
-    if (!board) {
-      return res.status(404).json({
-        success: false,
-        message: "Board not found",
-      });
-    }
-
-    // 2. Check requester membership
-    const requesterMembership = await BoardMember.findOne({
-      where: {
-        boardId: id,
-        userId: req.user.id,
-      },
+    const stars = await BoardStar.findAll({
+      where: { userId: req.user.id },
+      include: [
+        {
+          model: Board,
+          required: true,
+          include: [
+            {
+              model: Workspace,
+              as: "workspace",
+              attributes: ["id", "name", "userId"],
+              required: true,
+            },
+          ],
+        },
+      ],
+      order: [["createdAt", "DESC"]],
     });
 
-    if (!requesterMembership) {
-      return res.status(403).json({
-        success: false,
-        message: "You are not a member of this board",
-      });
-    }
+    const boardIds = stars.map((star) => star.boardId);
 
-    // 3. Only OWNER can invite
-    if (requesterMembership.role !== "OWNER") {
-      return res.status(403).json({
-        success: false,
-        message: "Only the board owner can invite members",
-      });
-    }
+    const memberships = boardIds.length
+      ? await BoardMember.findAll({
+          where: { userId: req.user.id, boardId: { [Op.in]: boardIds } },
+          attributes: ["boardId", "role"],
+        })
+      : [];
 
-    // 4. Only MEMBER and VIEWER can be invited
-    if (!["MEMBER", "VIEWER"].includes(role)) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid board role",
-      });
-    }
+    const roleByBoard = new Map(memberships.map((m) => [m.boardId, m.role]));
 
-    // 5. Find invited user
-    const user = await User.findOne({
-      where: {
-        email,
-      },
-    });
+    const ownerIds = [
+      ...new Set(stars.map((star) => star.Board.workspace.userId)),
+    ];
+    const owners = ownerIds.length
+      ? await User.findAll({
+          where: { id: { [Op.in]: ownerIds } },
+          attributes: ["id", "name", "email"],
+        })
+      : [];
+    const ownerById = new Map(owners.map((owner) => [owner.id, owner]));
 
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found with this email",
-      });
-    }
+    const boards = stars
+      .map((star) => {
+        const board = star.Board;
+        const isOwner = board.workspace.userId === req.user.id;
+        const role = isOwner ? "OWNER" : roleByBoard.get(board.id);
 
-    // 6. Prevent self invite
-    if (user.id === req.user.id) {
-      return res.status(400).json({
-        success: false,
-        message: "You cannot invite yourself",
-      });
-    }
+        // A star on a board the user can no longer open is not shown
+        if (!role) return null;
 
-    // 7. Check if already a member
-    const existingMember = await BoardMember.findOne({
-      where: {
-        boardId: id,
-        userId: user.id,
-      },
-    });
+        const owner = ownerById.get(board.workspace.userId);
 
-    if (existingMember) {
-      return res.status(400).json({
-        success: false,
-        message: "User is already a board member",
-      });
-    }
+        return {
+          id: board.id,
+          name: board.name,
+          background: board.background,
+          workspaceId: board.workspaceId,
+          workspaceName: board.workspace.name,
+          isStarred: true,
+          role: roleLabel(role),
+          isShared: !isOwner,
+          owner: owner
+            ? { id: owner.id, name: owner.name, email: owner.email }
+            : null,
+        };
+      })
+      .filter(Boolean);
 
-    // 8. Create membership
-    const member = await BoardMember.create({
-      boardId: id,
-      userId: user.id,
-      role,
-    });
-
-    return res.status(201).json({
-      success: true,
-      message: "Member invited successfully",
-      member,
-    });
+    return res.status(200).json({ success: true, boards });
   } catch (error) {
-    console.error("Invite member error:", error);
-
+    console.log("Get Starred Boards Error:", error);
     return res.status(500).json({
       success: false,
-      message: "Failed to invite member",
+      message: "Internal Server Error",
     });
   }
 };
-const getBoardMembers = async (req, res) => {
-  try {
-    const { id } = req.params;
 
-    // Check board exists
-    const board = await Board.findByPk(id);
+// GET /boards/all - every board I can open: mine and shared with me
+const getAllBoards = async (req, res) => {
+  try {
+    const boardIds = await getAccessibleBoardIds(req.user.id);
+
+    if (boardIds.length === 0) {
+      return res.status(200).json({ success: true, boards: [] });
+    }
+
+    const boards = await Board.findAll({
+      where: { id: { [Op.in]: boardIds } },
+      include: [
+        {
+          model: Workspace,
+          as: "workspace",
+          attributes: ["id", "name", "userId"],
+          required: true,
+        },
+      ],
+      order: [["createdAt", "DESC"]],
+    });
+
+    const [memberships, stars] = await Promise.all([
+      BoardMember.findAll({
+        where: { userId: req.user.id, boardId: { [Op.in]: boardIds } },
+        attributes: ["boardId", "role"],
+      }),
+      starredSet(req.user.id, boardIds),
+    ]);
+
+    const roleByBoard = new Map(memberships.map((m) => [m.boardId, m.role]));
+
+    const ownerIds = [...new Set(boards.map((b) => b.workspace.userId))];
+    const owners = await User.findAll({
+      where: { id: { [Op.in]: ownerIds } },
+      attributes: ["id", "name", "email"],
+    });
+    const ownerById = new Map(owners.map((owner) => [owner.id, owner]));
+
+    const result = boards.map((board) => {
+      const isOwner = board.workspace.userId === req.user.id;
+      const owner = ownerById.get(board.workspace.userId);
+
+      return {
+        id: board.id,
+        name: board.name,
+        background: board.background,
+        workspaceId: board.workspaceId,
+        workspaceName: board.workspace.name,
+        createdAt: board.createdAt,
+        isStarred: stars.has(board.id),
+        role: roleLabel(isOwner ? "OWNER" : roleByBoard.get(board.id)),
+        isShared: !isOwner,
+        owner: owner
+          ? { id: owner.id, name: owner.name, email: owner.email }
+          : null,
+      };
+    });
+
+    return res.status(200).json({ success: true, boards: result });
+  } catch (error) {
+    console.log("Get All Boards Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
+  }
+};
+
+// GET /boards/:id/archived - what was archived on a board, newest first
+const getArchivedItems = async (req, res) => {
+  try {
+    const board = await Board.findByPk(req.params.id);
 
     if (!board) {
       return res.status(404).json({
@@ -700,52 +779,65 @@ const getBoardMembers = async (req, res) => {
       });
     }
 
-    // Check requester is a board member
-    const requesterMembership = await BoardMember.findOne({
-      where: {
-        boardId: id,
-        userId: req.user.id,
-      },
-    });
-
-    if (!requesterMembership) {
-      return res.status(403).json({
-        success: false,
-        message: "You are not a member of this board",
-      });
+    const role = await getBoardRole(req.user.id, board);
+    if (!canRead(role)) {
+      return denied(res);
     }
 
-    // Get all board members
-    const members = await BoardMember.findAll({
-      where: {
-        boardId: id,
-      },
-      include: [
-        {
-          model: User,
-          attributes: ["id", "name", "email"],
-        },
-      ],
-      order: [
-        ["role", "ASC"],
-        ["createdAt", "ASC"],
-      ],
-    });
+    const [lists, cards] = await Promise.all([
+      List.findAll({
+        where: { boardId: board.id, isArchived: true },
+        attributes: ["id", "name", "archivedAt"],
+        include: [{ model: Card, as: "cards", attributes: ["id"] }],
+        order: [["archivedAt", "DESC"]],
+      }),
+      Card.findAll({
+        where: { isArchived: true },
+        attributes: ["id", "title", "dueDate", "isCompleted", "coverImage", "listId", "archivedAt"],
+        include: [
+          {
+            model: List,
+            attributes: ["id", "name"],
+            required: true,
+            where: { boardId: board.id, isArchived: false },
+          },
+        ],
+        order: [["archivedAt", "DESC"]],
+      }),
+    ]);
 
     return res.status(200).json({
       success: true,
-      members,
+      lists: lists.map((list) => ({
+        id: list.id,
+        name: list.name,
+        archivedAt: list.archivedAt,
+        cardCount: list.cards.length,
+      })),
+      cards: cards.map((card) => ({
+        id: card.id,
+        title: card.title,
+        dueDate: card.dueDate,
+        isCompleted: card.isCompleted,
+        coverImage: card.coverImage,
+        archivedAt: card.archivedAt,
+        listId: card.listId,
+        listName: card.List.name,
+      })),
     });
   } catch (error) {
-    console.error("Get Board Members Error:", error);
-
+    console.log("Get Archived Items Error:", error);
     return res.status(500).json({
       success: false,
-      message: "Failed to get board members",
+      message: "Internal Server Error",
     });
   }
 };
+
 module.exports = {
+  getArchivedItems,
+  getAllBoards,
+  getStarredBoards,
   createBoard,
   getBoards,
   updateBoard,
@@ -754,6 +846,4 @@ module.exports = {
   searchBoards,
   toggleStarBoard,
   filterBoardCards,
-  inviteToBoard,
-  getBoardMembers,
 };

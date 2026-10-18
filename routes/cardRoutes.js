@@ -13,6 +13,7 @@ const {
   searchCards,
   reorderCards,
   toggleCardCompleted,
+  setCardArchived,
 } = require("../controllers/cardController");
 
 router.post("/", authMiddleware, createCard);
@@ -23,6 +24,7 @@ router.get("/:listId" , authMiddleware , getCards);
 router.put("/:id" , authMiddleware , updateCard);
 router.delete("/:id" , authMiddleware , deleteCard);
 router.patch("/:id/due-date" , authMiddleware , updateDueDate);
+router.patch("/:id/archive", authMiddleware, setCardArchived);
 router.patch(
   "/:id/toggle-complete",
   authMiddleware,

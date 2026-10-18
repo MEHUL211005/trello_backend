@@ -7,7 +7,7 @@ router.get('/email', async (req, res) => {
   try {
     await sendEmail({
       to: 'mihul@softradix.in',
-      subject: 'Trello Test Email',
+      subject: 'TaskSphere Test Email',
       html: '<h2>Hello Mehul </h2><p>Brevo is working successfully.</p>',
     });
 

@@ -1,5 +1,5 @@
 {
-  "name": "trello-backend",
+  "name": "tasksphere-api",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -16,11 +16,13 @@
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "helmet": "^8.3.0",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.2.0",
     "mysql2": "^3.23.1",
     "sequelize": "^6.37.8",
-    "sib-api-v3-sdk": "^8.5.0"
+    "sib-api-v3-sdk": "^8.5.0",
+    "socket.io": "^4.8.4"
   },
   "devDependencies": {
     "nodemon": "^3.1.14"

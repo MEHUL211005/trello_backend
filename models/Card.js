@@ -29,6 +29,18 @@ coverImage: {
     type: DataTypes.BOOLEAN,
     defaultValue: false,
   },
+
+  // Archived cards leave the list but keep all their data
+  isArchived: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: false,
+  },
+
+  archivedAt: {
+    type: DataTypes.DATE,
+    allowNull: true,
+  },
 });
 
 module.exports = Card;

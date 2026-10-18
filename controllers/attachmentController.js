@@ -1,5 +1,6 @@
 const Attachment = require("../models/Attachment");
-const Card = require("../models/Card");
+const { getCardAccess, canRead, canWrite, denied } = require("../utils/boardAccess");
+const createActivity = require("../utils/createActivity");
 const fs = require("fs");
 const path = require("path");
 
@@ -10,13 +11,26 @@ const uploadAttachment = async (req, res) => {
 
     // console.log("CARD ID:", cardId); 
 
-    const card = await Card.findByPk(cardId);
+    // multer has already written the file, so remove it if we reject
+    const discardUpload = () => {
+      if (req.file) {
+        fs.unlink(req.file.path, () => {});
+      }
+    };
+
+    const { card, role } = await getCardAccess(req.user.id, cardId);
 
     if (!card) {
+      discardUpload();
       return res.status(404).json({
         success: false,
         message: "Card not found",
       });
+    }
+
+    if (!canWrite(role)) {
+      discardUpload();
+      return denied(res);
     }
 
     if (!req.file) {
@@ -34,6 +48,8 @@ const uploadAttachment = async (req, res) => {
       size: req.file.size,
       cardId: Number(cardId),
     });
+
+    await createActivity(`attached "${attachment.originalName}"`, card.id, req.user.id);
 
     return res.status(201).json({
       success: true,
@@ -55,6 +71,19 @@ const getAttachments = async (req, res) => {
   try {
 
     const { cardId } = req.params;
+
+    const { card, role } = await getCardAccess(req.user.id, cardId);
+
+    if (!card) {
+      return res.status(404).json({
+        success: false,
+        message: "Card not found",
+      });
+    }
+
+    if (!canRead(role)) {
+      return denied(res);
+    }
 
     const attachments = await Attachment.findAll({
       where: { cardId },
@@ -92,10 +121,17 @@ const deleteAttachment = async (req, res) => {
       });
     }
 
+    const { role } = await getCardAccess(req.user.id, attachment.cardId);
+
+    if (!canWrite(role)) {
+      return denied(res);
+    }
+
     const filePath = path.join(
       __dirname,
       "..",
-      attachment.fileUrl
+      "uploads",
+      path.basename(attachment.fileName)
     );
 
     if (fs.existsSync(filePath)) {
@@ -103,6 +139,8 @@ const deleteAttachment = async (req, res) => {
     }
 
     await attachment.destroy();
+
+    await createActivity(`removed the attachment "${attachment.originalName}"`, attachment.cardId, req.user.id);
 
     return res.status(200).json({
       success: true,
@@ -134,7 +172,7 @@ const setAttachmentAsCover = async (req, res) => {
       });
     }
 
-    const card = await Card.findByPk(attachment.cardId);
+    const { card, role } = await getCardAccess(req.user.id, attachment.cardId);
 
     if (!card) {
       return res.status(404).json({
@@ -143,10 +181,16 @@ const setAttachmentAsCover = async (req, res) => {
       });
     }
 
+    if (!canWrite(role)) {
+      return denied(res);
+    }
+
     // Set cover image
     card.coverImage = attachment.fileUrl;
 
     await card.save();
+
+    await createActivity("set a new cover image", card.id, req.user.id);
 
     return res.status(200).json({
       success: true,

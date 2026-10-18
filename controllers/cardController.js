@@ -1,3 +1,13 @@
+const {
+  getBoardRole,
+  getBoardRoleById,
+  getCardAccess,
+  getAccessibleBoardIds,
+  canRead,
+  canWrite,
+  denied,
+} = require("../utils/boardAccess");
+const sequelize = require("../config/database");
 const { Op } = require("sequelize");
 
 const Card = require("../models/Card");
@@ -39,18 +49,15 @@ const createCard = async (req, res) => {
 
     const board = await Board.findByPk(list.boardId);
 
-    const workspace = await Workspace.findOne({
-      where: {
-        id: board.workspaceId,
-        userId: req.user.id,
-      },
-    });
+    const role = await getBoardRole(req.user.id, board);
+    if (!canWrite(role)) {
+      return denied(res);
+    }
 
-    if (!workspace) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
+    // Put the card at the end of the list unless a position was given
+    if (position === undefined || position === null) {
+      const lastPosition = await Card.max("position", { where: { listId } });
+      position = (lastPosition ?? -1) + 1;
     }
 
     const card = await Card.create({
@@ -101,23 +108,14 @@ const getCards = async (req, res) => {
 
     const board = await Board.findByPk(list.boardId);
 
-    const workspace = await Workspace.findOne({
-      where: {
-        id: board.workspaceId,
-        userId: req.user.id,
-      },
-    });
-
-    if (!workspace) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
+    const role = await getBoardRole(req.user.id, board);
+    if (!canRead(role)) {
+      return denied(res);
     }
 
   const cards = await Card.findAll({
 
-  where: { listId },
+  where: { listId, isArchived: false },
 
 
   include:[
@@ -209,26 +207,9 @@ const getSingleCard = async (req, res) => {
 
 
 
-    const workspace = await Workspace.findOne({
-
-      where: {
-        id: board.workspaceId,
-        userId: req.user.id,
-      },
-
-    });
-
-
-
-    if (!workspace) {
-
-      return res.status(403).json({
-
-        success: false,
-        message: "Access denied",
-
-      });
-
+    const role = await getBoardRole(req.user.id, board);
+    if (!canRead(role)) {
+      return denied(res);
     }
 
 
@@ -288,18 +269,9 @@ const updateCard = async (req, res) => {
     const list = await List.findByPk(card.listId);
     const board = await Board.findByPk(list.boardId);
 
-    const workspace = await Workspace.findOne({
-      where: {
-        id: board.workspaceId,
-        userId: req.user.id,
-      },
-    });
-
-    if (!workspace) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
+    const role = await getBoardRole(req.user.id, board);
+    if (!canWrite(role)) {
+      return denied(res);
     }
 
     // Update only provided fields
@@ -313,16 +285,26 @@ const updateCard = async (req, res) => {
         });
       }
 
+      if (card.title !== title.trim()) {
+        await createActivity(
+          `renamed this card from "${card.title}" to "${title.trim()}"`,
+          card.id,
+          req.user.id
+        );
+      }
+
       card.title = title.trim();
     }
 if (description !== undefined) {
-  card.description = description;
+  if ((card.description || "") !== (description || "")) {
+    await createActivity(
+      description ? "updated the description" : "removed the description",
+      card.id,
+      req.user.id
+    );
+  }
 
-  await createActivity(
-    "updated the description",
-    card.id,
-    req.user.id
-  );
+  card.description = description;
 }
 
 if (dueDate !== undefined) {
@@ -339,14 +321,46 @@ if (dueDate !== undefined) {
     }
 
     if (isCompleted !== undefined) {
+      if (card.isCompleted !== isCompleted) {
+        await createActivity(
+          isCompleted ? "marked this card complete" : "marked this card incomplete",
+          card.id,
+          req.user.id
+        );
+      }
+
       card.isCompleted = isCompleted;
     }
 
-    if (listId !== undefined) {
-      card.listId = listId;
+    if (listId !== undefined && Number(listId) !== card.listId) {
+      // A card can only be moved to another list on the same board
+      const targetList = await List.findByPk(listId);
+
+      if (!targetList || targetList.boardId !== list.boardId) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid target list",
+        });
+      }
+
+      await createActivity(
+        `moved this card from "${list.name}" to "${targetList.name}"`,
+        card.id,
+        req.user.id
+      );
+
+      card.listId = targetList.id;
     }
 
     if (coverImage !== undefined) {
+      if ((card.coverImage || "") !== (coverImage || "")) {
+        await createActivity(
+          coverImage ? "changed the cover image" : "removed the cover image",
+          card.id,
+          req.user.id
+        );
+      }
+
       card.coverImage = coverImage;
     }
 
@@ -388,18 +402,9 @@ const deleteCard = async (req, res) => {
     const list = await List.findByPk(card.listId);
     const board = await Board.findByPk(list.boardId);
 
-    const workspace = await Workspace.findOne({
-      where: {
-        id: board.workspaceId,
-        userId: req.user.id,
-      },
-    });
-
-    if (!workspace) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
+    const role = await getBoardRole(req.user.id, board);
+    if (!canWrite(role)) {
+      return denied(res);
     }
 
     await card.destroy();
@@ -428,13 +433,17 @@ const updateDueDate = async (req, res) => {
     const { id } = req.params;
     const { dueDate } = req.body;
 
-    const card = await Card.findByPk(id);
+    const { card, role } = await getCardAccess(req.user.id, id);
 
     if (!card) {
       return res.status(404).json({
         success: false,
         message: "Card not found",
       });
+    }
+
+    if (!canWrite(role)) {
+      return denied(res);
     }
 
     card.dueDate = dueDate;
@@ -477,16 +486,22 @@ const searchCards = async (req, res) => {
       });
     }
 
+    // Only search boards the user can access
+    const boardIds = await getAccessibleBoardIds(req.user.id);
+
     const cards = await Card.findAll({
   where: {
+    isArchived: false,
     title: {
-      [Op.like]: `%${query}%`,
+      [Op.like]: `%${query.trim()}%`,
     },
   },
   include: [
     {
       model: List,
       attributes: ["id", "name"],
+      required: true,
+      where: { boardId: { [Op.in]: boardIds }, isArchived: false },
       include: [
         {
           model: Board,
@@ -528,22 +543,105 @@ const reorderCards = async (req, res) => {
     }
 
 
-  for (const item of cards) {
+    const isValidItem = (item) =>
+      item &&
+      Number.isInteger(Number(item.id)) &&
+      Number.isInteger(Number(item.position)) &&
+      (item.listId === undefined ||
+        item.listId === null ||
+        Number.isInteger(Number(item.listId)));
 
-  await Card.update(
-    {
-      listId: item.listId,
-      position: item.position,
-    },
-    {
-      where:{
-        id:item.id
+    if (!cards.every(isValidItem)) {
+      return res.status(400).json({
+        success: false,
+        message: "Each card needs an id and a position",
+      });
+    }
+
+    // Load the cards being moved
+    const cardIds = cards.map((item) => Number(item.id));
+
+    const dbCards = await Card.findAll({
+      where: { id: { [Op.in]: cardIds } },
+      include: [List],
+    });
+
+    // A card with no listId stays in the list it is already in
+    const currentListOf = new Map(dbCards.map((card) => [card.id, card.listId]));
+    const targetListOf = (item) =>
+      item.listId === undefined || item.listId === null
+        ? currentListOf.get(Number(item.id))
+        : Number(item.listId);
+
+    const targetListIds = [
+      ...new Set(cards.map(targetListOf).filter((id) => id !== undefined)),
+    ];
+
+    const targetLists = await List.findAll({
+      where: { id: { [Op.in]: targetListIds } },
+    });
+
+    if (
+      dbCards.length !== new Set(cardIds).size ||
+      targetLists.length !== targetListIds.length
+    ) {
+      return res.status(404).json({
+        success: false,
+        message: "Card or list not found",
+      });
+    }
+
+    // Every card must be on a board the user can edit, and may only
+    // move to a list on that same board
+    const boardOfList = new Map(targetLists.map((l) => [l.id, l.boardId]));
+    const roleByBoard = new Map();
+
+    for (const card of dbCards) {
+      const boardId = card.List.boardId;
+
+      if (!roleByBoard.has(boardId)) {
+        const { role } = await getBoardRoleById(req.user.id, boardId);
+        roleByBoard.set(boardId, role);
+      }
+
+      const item = cards.find((c) => Number(c.id) === card.id);
+
+      if (
+        !canWrite(roleByBoard.get(boardId)) ||
+        boardOfList.get(targetListOf(item)) !== boardId
+      ) {
+        return denied(res);
       }
     }
-  );
 
-}
+    const listNameOf = new Map(targetLists.map((l) => [l.id, l.name]));
+    const moves = cards
+      .map((item) => ({ card: dbCards.find((c) => c.id === Number(item.id)), to: targetListOf(item) }))
+      .filter(({ card, to }) => card && card.listId !== to);
 
+    await sequelize.transaction(async (transaction) => {
+      for (const item of cards) {
+        await Card.update(
+          {
+            listId: targetListOf(item),
+            position: Number(item.position),
+          },
+          {
+            where: { id: Number(item.id) },
+            transaction,
+          }
+        );
+      }
+    });
+
+
+    for (const { card, to } of moves) {
+      await createActivity(
+        `moved this card from "${card.List.name}" to "${listNameOf.get(to)}"`,
+        card.id,
+        req.user.id
+      );
+    }
 
     return res.status(200).json({
       success: true,
@@ -566,7 +664,7 @@ const toggleCardCompleted = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const card = await Card.findByPk(id);
+    const { card, role } = await getCardAccess(req.user.id, id);
 
     if (!card) {
       return res.status(404).json({
@@ -575,9 +673,19 @@ const toggleCardCompleted = async (req, res) => {
       });
     }
 
+    if (!canWrite(role)) {
+      return denied(res);
+    }
+
     card.isCompleted = !card.isCompleted;
 
     await card.save();
+
+    await createActivity(
+      card.isCompleted ? "marked this card complete" : "marked this card incomplete",
+      card.id,
+      req.user.id
+    );
 
     return res.status(200).json({
       success: true,
@@ -593,7 +701,73 @@ const toggleCardCompleted = async (req, res) => {
     });
   }
 };
+
+// ARCHIVE / RESTORE CARD  (body: { archived: true | false })
+// Nothing is removed: description, attachments, checklists, labels, members
+// and comments all stay with the card.
+const setCardArchived = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const archived = req.body?.archived !== false;
+
+    const { card, list, role } = await getCardAccess(req.user.id, id);
+
+    if (!card) {
+      return res.status(404).json({
+        success: false,
+        message: "Card not found",
+      });
+    }
+
+    if (!canWrite(role)) {
+      return denied(res);
+    }
+
+    if (!archived && list.isArchived) {
+      return res.status(409).json({
+        success: false,
+        message: `Restore the list "${list.name}" first`,
+      });
+    }
+
+    if (card.isArchived !== archived) {
+      card.isArchived = archived;
+      card.archivedAt = archived ? new Date() : null;
+
+      if (!archived) {
+        // A restored card returns at the bottom of its list
+        const last = await Card.max("position", {
+          where: { listId: card.listId, isArchived: false },
+        });
+        card.position = (last ?? -1) + 1;
+      }
+
+      await card.save();
+
+      await createActivity(
+        archived ? "archived this card" : "restored this card",
+        card.id,
+        req.user.id
+      );
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: archived ? "Card archived" : "Card restored",
+      card,
+    });
+  } catch (error) {
+    console.log("Archive Card Error:", error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal Server Error",
+    });
+  }
+};
+
 module.exports = {
+  setCardArchived,
   createCard,
   getCards,
   getSingleCard,

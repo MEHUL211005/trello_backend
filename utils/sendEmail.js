@@ -7,14 +7,17 @@ apiKey.apiKey = process.env.BREVO_API_KEY;
 
 const apiInstance = new SibApiV3Sdk.TransactionalEmailsApi();
 
-const sendEmail = async ({ to, subject, html }) => {
+// `replyTo` ({ email, name }) makes "Reply" in the recipient's mail app
+// answer that person instead of the no-reply sender.
+const sendEmail = async ({ to, subject, html, replyTo }) => {
   try {
     await apiInstance.sendTransacEmail({
       sender: {
-        name: 'TRELLO',
-        email: 'mihul@softradix.in',
+        name: process.env.BREVO_SENDER_NAME || 'TaskSphere',
+        email: process.env.BREVO_SENDER_EMAIL,
       },
       to: [{ email: to }],
+      ...(replyTo ? { replyTo } : {}),
       subject,
       htmlContent: html,
     });

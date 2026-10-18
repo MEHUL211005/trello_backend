@@ -37,7 +37,15 @@ const authMiddleware = (req, res, next) => {
     next();
 
   } catch (error) {
-    console.log("Auth Error:", error);
+    // An expired access token is routine: the app refreshes it on the 401
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({
+        success: false,
+        message: "Token expired",
+      });
+    }
+
+    console.log("Auth Error:", error.message);
 
     return res.status(401).json({
       success: false,

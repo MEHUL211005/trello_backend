@@ -1,5 +1,13 @@
+const {
+  getBoardRole,
+  getCardAccess,
+  canRead,
+  canWrite,
+  denied,
+} = require("../utils/boardAccess");
 const Checklist = require("../models/Checklist");
 const Card = require("../models/Card");
+
 const List = require("../models/List");
 const Board = require("../models/Board");
 const Workspace = require("../models/Workspace");
@@ -34,18 +42,9 @@ const createChecklist = async (req, res) => {
     const list = await List.findByPk(card.listId);
     const board = await Board.findByPk(list.boardId);
 
-    const workspace = await Workspace.findOne({
-      where: {
-        id: board.workspaceId,
-        userId: req.user.id,
-      },
-    });
-
-    if (!workspace) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
+    const role = await getBoardRole(req.user.id, board);
+    if (!canWrite(role)) {
+      return denied(res);
     }
 
     // Create checklist
@@ -53,6 +52,8 @@ const createChecklist = async (req, res) => {
       title: title.trim(),
       cardId,
     });
+
+    await createActivity(`added the checklist "${checklist.title}"`, card.id, req.user.id);
 
     return res.status(201).json({
       success: true,
@@ -90,18 +91,9 @@ const getChecklists = async (req, res) => {
     const list = await List.findByPk(card.listId);
     const board = await Board.findByPk(list.boardId);
 
-    const workspace = await Workspace.findOne({
-      where: {
-        id: board.workspaceId,
-        userId: req.user.id,
-      },
-    });
-
-    if (!workspace) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
+    const role = await getBoardRole(req.user.id, board);
+    if (!canRead(role)) {
+      return denied(res);
     }
 
     // Get checklists with items
@@ -164,18 +156,9 @@ const addChecklistItem = async (req, res) => {
     const list = await List.findByPk(card.listId);
     const board = await Board.findByPk(list.boardId);
 
-    const workspace = await Workspace.findOne({
-      where: {
-        id: board.workspaceId,
-        userId: req.user.id,
-      },
-    });
-
-    if (!workspace) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
+    const role = await getBoardRole(req.user.id, board);
+    if (!canWrite(role)) {
+      return denied(res);
     }
 
     // Create item
@@ -230,18 +213,9 @@ const toggleChecklistItem = async (req, res) => {
     const list = await List.findByPk(item.Checklist.Card.listId);
     const board = await Board.findByPk(list.boardId);
 
-    const workspace = await Workspace.findOne({
-      where: {
-        id: board.workspaceId,
-        userId: req.user.id,
-      },
-    });
-
-    if (!workspace) {
-      return res.status(403).json({
-        success: false,
-        message: "Access denied",
-      });
+    const role = await getBoardRole(req.user.id, board);
+    if (!canWrite(role)) {
+      return denied(res);
     }
 
     // Toggle completed
@@ -294,6 +268,15 @@ const updateChecklistItem = async (req, res) => {
       });
     }
 
+    {
+      const parent = await Checklist.findByPk(item.checklistId);
+      const { role } = await getCardAccess(req.user.id, parent.cardId);
+      if (!canWrite(role)) {
+        return denied(res);
+      }
+    }
+
+
     item.text = text.trim();
 
     await item.save();
@@ -327,6 +310,15 @@ const deleteChecklistItem = async (req, res) => {
         message: "Checklist item not found",
       });
     }
+
+    {
+      const parent = await Checklist.findByPk(item.checklistId);
+      const { role } = await getCardAccess(req.user.id, parent.cardId);
+      if (!canWrite(role)) {
+        return denied(res);
+      }
+    }
+
 
     await item.destroy();
 
@@ -368,6 +360,14 @@ const updateChecklist = async (req, res) => {
       });
     }
 
+    {
+      const { role } = await getCardAccess(req.user.id, checklist.cardId);
+      if (!canWrite(role)) {
+        return denied(res);
+      }
+    }
+
+
     checklist.title = title.trim();
 
     await checklist.save();
@@ -402,7 +402,17 @@ const deleteChecklist = async (req, res) => {
       });
     }
 
+    {
+      const { role } = await getCardAccess(req.user.id, checklist.cardId);
+      if (!canWrite(role)) {
+        return denied(res);
+      }
+    }
+
+
     await checklist.destroy();
+
+    await createActivity(`deleted the checklist "${checklist.title}"`, checklist.cardId, req.user.id);
 
     return res.status(200).json({
       success: true,
@@ -435,6 +445,14 @@ const getChecklistProgress = async (req, res) => {
         message: "Checklist not found",
       });
     }
+
+    {
+      const { role } = await getCardAccess(req.user.id, checklist.cardId);
+      if (!canRead(role)) {
+        return denied(res);
+      }
+    }
+
 
     const total = checklist.ChecklistItems.length;
 
