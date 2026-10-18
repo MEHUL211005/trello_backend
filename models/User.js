@@ -68,6 +68,12 @@ const User = sequelize.define(
       type: DataTypes.DATE,
       allowNull: true,
     },
+    // When they last signed in (empty until the first sign-in)
+    lastLoginAt: {
+      type: DataTypes.DATE,
+      allowNull: true,
+    },
+
     refreshToken: {
     type: DataTypes.TEXT,
     allowNull: true,

@@ -121,10 +121,16 @@ const deleteAttachment = async (req, res) => {
       });
     }
 
-    const { role } = await getCardAccess(req.user.id, attachment.cardId);
+    const { card, role } = await getCardAccess(req.user.id, attachment.cardId);
 
     if (!canWrite(role)) {
       return denied(res);
+    }
+
+    // A deleted picture must not stay behind as the card's cover
+    if (card && card.coverImage === attachment.fileUrl) {
+      card.coverImage = null;
+      await card.save();
     }
 
     const filePath = path.join(

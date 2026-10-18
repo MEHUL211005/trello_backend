@@ -34,7 +34,16 @@ const uploadRoute = require("./routes/uploadRoute");
 const feedbackRoutes = require("./routes/feedbackRoutes");
 const plannerRoutes = require("./routes/plannerRoutes");
 // The client runs on another origin and loads images from /uploads
-app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
+// SERVE_FRONTEND_DIR (live-demo mode, see below) serves the website from this
+// server, whose page needs an inline theme script and web fonts
+const serveFrontendDir = process.env.SERVE_FRONTEND_DIR;
+
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: "cross-origin" },
+    ...(serveFrontendDir ? { contentSecurityPolicy: false } : {}),
+  })
+);
 app.use(cors({
   origin: process.env.CLIENT_URL,
   credentials: true,
@@ -74,6 +83,30 @@ app.use("/api/attachments" , attachmentRoutes);
 app.use("/api/upload", uploadRoute);
 app.use("/api/feedback", feedbackRoutes);
 app.use("/api/planner", plannerRoutes);
+
+// Live-demo mode: with SERVE_FRONTEND_DIR set to the built website, this one
+// server carries the site AND the API, so a single public link is enough.
+// Off by default, so normal development is unchanged.
+if (serveFrontendDir) {
+  const frontendDir = path.resolve(serveFrontendDir);
+
+  // Behind a tunnel/proxy: count visitors by their real address
+  app.set("trust proxy", true);
+
+  app.use(express.static(frontendDir));
+
+  // Any other page address belongs to the single-page app
+  app.use((req, res, next) => {
+    if (
+      req.method !== "GET" ||
+      /^\/(api|uploads|socket\.io)(\/|$)/.test(req.path)
+    ) {
+      return next();
+    }
+
+    res.sendFile(path.join(frontendDir, "index.html"));
+  });
+}
 
 // Upload errors (file too large, type not allowed) and anything unhandled
 app.use((err, req, res, next) => {

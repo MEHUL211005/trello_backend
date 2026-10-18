@@ -44,7 +44,7 @@ const notify = async (payload) => {
   }
 };
 
-const clientUrl = () => process.env.CLIENT_URL || "http://localhost:5173";
+const clientUrl = require("../utils/appUrl");
 
 // Load the board and the requester's role in one go
 const loadBoard = async (boardId, userId) => {

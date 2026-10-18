@@ -6,6 +6,7 @@ const { Op } = require("sequelize");
 const { acceptPendingInvitations } = require("../utils/invitations");
 const sendEmail = require("../utils/sendEmail");
 const { otpEmail, resetPasswordEmail } = require("../utils/emailTemplates");
+const appUrl = require("../utils/appUrl");
 const {
   validateEmail,
   validateName,
@@ -233,8 +234,10 @@ const loginUser = async (req, res) => {
 const accessToken = generateAccessToken(user);
 const refreshToken = generateRefreshToken(user);
 
-// Save refresh token in DB
+// Save refresh token in DB (and remember this sign-in)
+const firstLogin = !user.lastLoginAt;
 user.refreshToken = refreshToken;
+user.lastLoginAt = new Date();
 await user.save();
 
 // Send refresh token as HttpOnly cookie
@@ -249,6 +252,7 @@ res.cookie("refreshToken", refreshToken, {
 return res.status(200).json({
   success: true,
   message: "Login successful",
+  firstLogin,
   accessToken,
   user: {
     id: user.id,
@@ -646,7 +650,7 @@ const forgotPassword = async (req, res) => {
     );
     await user.save();
 
-    const link = `${process.env.CLIENT_URL}/reset-password/${token}`;
+    const link = `${appUrl()}/reset-password/${token}`;
 
     try {
       await sendEmail({

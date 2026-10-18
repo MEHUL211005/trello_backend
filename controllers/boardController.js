@@ -12,7 +12,7 @@ const Label = require("../models/Label");
 const BoardMember = require ("../models/BoardMember");
 const BoardStar = require("../models/BoardStar");
 const { normalizeBackground } = require("../utils/boardBackgrounds");
-const { withStars, starredSet } = require("../utils/stars");
+const { withStars, starredSet, listCounts } = require("../utils/stars");
 const {
   getBoardRole,
   getAccessibleBoardIds,
@@ -720,12 +720,13 @@ const getAllBoards = async (req, res) => {
       order: [["createdAt", "DESC"]],
     });
 
-    const [memberships, stars] = await Promise.all([
+    const [memberships, stars, counts] = await Promise.all([
       BoardMember.findAll({
         where: { userId: req.user.id, boardId: { [Op.in]: boardIds } },
         attributes: ["boardId", "role"],
       }),
       starredSet(req.user.id, boardIds),
+      listCounts(boardIds),
     ]);
 
     const roleByBoard = new Map(memberships.map((m) => [m.boardId, m.role]));
@@ -749,6 +750,7 @@ const getAllBoards = async (req, res) => {
         workspaceName: board.workspace.name,
         createdAt: board.createdAt,
         isStarred: stars.has(board.id),
+        listCount: counts.get(board.id) || 0,
         role: roleLabel(isOwner ? "OWNER" : roleByBoard.get(board.id)),
         isShared: !isOwner,
         owner: owner

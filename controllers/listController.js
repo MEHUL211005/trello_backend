@@ -124,7 +124,14 @@ const updateList = async (req, res) => {
       });
     }
 
-    name = name.trim();
+    name = String(name).trim();
+
+    if (!name) {
+      return res.status(400).json({
+        success: false,
+        message: "List name is required",
+      });
+    }
 
     const list = await List.findByPk(id);
 
