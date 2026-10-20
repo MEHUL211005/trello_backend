@@ -6,7 +6,11 @@ const helmet = require("helmet");
 const path = require("path");
 const rateLimit = require("./middlewares/rateLimit");
 const realtimeNotify = require("./middlewares/realtimeNotify");
+const requestLogger = require("./middlewares/requestLogger");
 const app = express();
+
+// First in line, so every request is logged, even the ones that are refused
+app.use(requestLogger);
 const sequelize = require("./config/database");
 
 const User = require("./models/User");

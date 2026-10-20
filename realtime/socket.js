@@ -38,6 +38,13 @@ const initSocket = (httpServer) => {
     // Personal channel: "a board was shared with you", "your access changed"
     socket.join(userRoom(socket.user.id));
 
+    if (process.env.LOG_REQUESTS !== "off") {
+      console.log(`${new Date().toTimeString().slice(0, 8)}  LIVE    connected     user:${socket.user.id}`);
+      socket.on("disconnect", () =>
+        console.log(`${new Date().toTimeString().slice(0, 8)}  LIVE    disconnected  user:${socket.user.id}`)
+      );
+    }
+
     socket.on("board:join", async (payload, ack) => {
       const reply = typeof ack === "function" ? ack : () => {};
 
